@@ -1,0 +1,2751 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Mantle_Adventure - Setor 5 Final Update</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #1a1a1a;
+            overflow: hidden;
+        }
+
+        canvas {
+            border: 5px solid #fff;
+            background-color: #3f3640;   /* Cinza escuro */
+            image-rendering: pixelated;
+            cursor: crosshair;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="gameCanvas" width="1280" height="720"></canvas>
+    <video id="videoFinal" style="display: none;" preload="auto">
+        <source src="levels/usogeral/final2.mp4" type="video/mp4">
+        Seu navegador não suporta vídeo.
+    </video>
+
+    <script>// === VÍDEO DA CUTSCENE FINAL ===
+        const videoFinal = document.getElementById("videoFinal");
+        videoFinal.volume = 0.8;
+        let videoFinalAtivo = false;
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        let aguardandoResetInput = false;
+        let mouseWorldX = 0;
+        let mouseWorldY = 0;
+        let exibindoMenuTeleporte = false;
+        let ferramentaEdicaoAtiva = false;
+        let emCutscene = false; // Bloqueia o teclado
+        let cenaArenaOcorreu = false; // Garante que a cena só rode uma vez
+        let intensidadeTremor = 0; // Controla a força da vibração
+        let travaCameraArena = false;
+        const limiteEsquerdoArena = 27685;
+        const limiteDireitoArena = 28900 + 74; // Pillar x + largura do pilar
+        let arenaConcluida = false; // Quando virar true, a câmera volta ao normal    
+        let tremorSomAtivo = false;   // Controla se o som já está tocando
+
+                let mouseIsPressed = false;
+        let mouseButton = 0;
+        let debugHitboxes = false; // Começa desligado
+        let pilarEspinhosAtivado = false;
+        // === EVENTO AMBUSH (emboscada do vigia) ===
+            let eventoAmbushAtivado = false;
+            let timerAmbush = 0;
+            let ambushStep = 0; // 0 = não iniciado, 1 = pausado, 2 = spawns, 3 = finalizando
+            
+
+        
+
+                // === OBJETOS VOADORES EM PARALLAX ===
+        let parallaxFlyingObjects = [];
+
+         // ===  correção da animação de pulo do gato apos a jaula
+        let cutsceneForcandoPosicao = false;   // nova flag
+        
+        
+
+        // --- NOVAS VARIÁVEIS DO MENU DEBUG ---
+        let indiceSelecaoMenu = 0;
+        let scrollMenu = 0;
+        const alturaItem = 40;
+
+        const menuDebug = {
+            faseSelecionada: 1,
+            pontos: {
+                1: [
+                    { x: 332, y: 580, nome: "Setor 1 - Início" },
+                    { x: 5600, y: 500, nome: "Setor 2 - Desafios" },
+                    { x: 11554, y: 600, nome: "Setor 3 - Plataformas" },
+                    { x: 17900, y: 400, nome: "Setor 4 - Escada Flutuante" },
+                    { x: 20800, y: 400, nome: "Setor 5 - Central" },
+                    { x: 21700, y: 300, nome: "Setor 5 - Pilar Invertido" },
+                    { x: 22100, y: 400, nome: "Setor 5 - Plataformas" },
+                    { x: 23932, y: 400, nome: "Setor 5 - Desafio Final" },
+                    { x: 25855, y: 500, nome: "Setor 6 - Escada de Cubos" },
+                    { x: 27490, y: 500, nome: "Setor 6 - entrada da arena1" },
+                ],
+                2: [{ x: 100, y: 500, nome: "Início do Level 2" }]
+            }
+        };
+
+        let godMode = false; // Começa desativado
+        let controlesBloqueados = false;
+        let scrollX = 0;
+        let movendoDireita = false;
+        let movendoEsquerda = false;
+        let vida = 6;
+        let gameOver = false;
+        let ultimoCheckpoint = { x: 332, y: 580 };
+        let tempoDano = 0;
+        const duracaoInvulnerabilidade = 1500;
+
+                const velMaxBase = 5;
+        const velMaxBoost = 9;
+        const aceleracao = 0.4;
+        const friccao = 0.2;
+        const pontoMortoX = canvas.width * 0.3;
+        const suavidadeCamera = 0.08;
+
+        let ultimaTeclaSolta = "";
+        let tempoUltimaSoltura = 0;
+        const intervaloDoubleTap = 150;
+
+        const pathBG = "levels/level1_spt/backgrounds_lv1/";
+        const pathSetor2 = "levels/level1_spt/plt_2/";
+        const pathUsoGeral = "levels/usogeral/";
+
+        
+
+        
+
+        // --- CARREGAMENTO DE SPRITES ---
+        const imgsAste = [];
+        for (let i = 1; i <= 4; i++) {
+            const img = new Image(); img.src = `${pathUsoGeral}aste${i}.png`; imgsAste.push(img);
+        }
+        const imgsAsteDireita = [];
+        for (let i = 1; i <= 4; i++) {
+            const img = new Image(); img.src = `${pathUsoGeral}astd${i}.png`; imgsAsteDireita.push(img);
+        }
+        const imgsAsteEsquerda = [];
+        for (let i = 1; i <= 4; i++) {
+            const img = new Image(); img.src = `${pathUsoGeral}ste${i}.png`; imgsAsteEsquerda.push(img);
+        }
+                        // Sprites da cutscene inicial
+                            const imgBearMoto2 = new Image();
+                            imgBearMoto2.src = "sprites_cat/catg_mantle/scene1/bearmoto2.png";
+                            
+                            const imgSpk1 = new Image();
+                                imgSpk1.src = "sprites_cat/catg_mantle/scene1/spk1.png";
+
+                                const imgSpk2 = new Image();
+                                imgSpk2.src = "sprites_cat/catg_mantle/scene1/spk2.png";
+
+                                const imgInternPose = new Image();
+                                imgInternPose.src = "sprites_cat/catg_mantle/scene1/internposeaction.png";
+
+                                const imgBearPose2 = new Image();   // para o próximo passo
+                                imgBearPose2.src = "sprites_cat/catg_mantle/scene1/bearpose2.png";
+
+        const imgPilarInvertido = new Image(); imgPilarInvertido.src = pathUsoGeral + "pilar2invertido.png";
+        const imgPltFlutuante = new Image(); imgPltFlutuante.src = pathUsoGeral + "plt2.png";
+        const imgCidadeDistante = new Image(); imgCidadeDistante.src = pathBG + "cit1.png";
+                const imgCloud = new Image();
+                    imgCloud.src = "levels/level1_spt/backgrounds_lv1/cloud.png";   // ajuste o caminho se necessário
+        const imgRochas = new Image(); imgRochas.src = pathBG + "elent_prl1.png";
+        const imgPlataformaS1 = new Image(); imgPlataformaS1.src = "levels/level1_spt/plt_1/pltsp_1.png";
+        const imgPlataformaS2 = new Image(); imgPlataformaS2.src = pathSetor2 + "pltsp_2.png";
+        const imgPlataformaS2Inv = new Image(); imgPlataformaS2Inv.src = pathSetor2 + "pltsp_2inv.png"; // Novo sprite
+        const imgCubo = new Image(); imgCubo.src = pathSetor2 + "cubo1.png";
+        const imgCuboV2 = new Image(); imgCuboV2.src = pathUsoGeral + "cubov2.png";
+        const imgLifeTxt = new Image(); imgLifeTxt.src = pathUsoGeral + "life_txt.png";
+        const imgHeart = new Image(); imgHeart.src = pathUsoGeral + "heart.png";
+        const imgPilar2 = new Image(); imgPilar2.src = pathSetor2 + "pilar2.png";
+        const imgPilarTriplo = new Image(); imgPilarTriplo.src = pathUsoGeral + "pilartriplo.png";
+        const imgPilarTriploInv = new Image(); imgPilarTriploInv.src = pathUsoGeral + "pilartriplo_inv.png";
+        const imgEspinhos2 = new Image(); imgEspinhos2.src = pathSetor2 + "espinhos2.png";
+        const imgEspinhos3 = new Image(); imgEspinhos3.src = pathSetor2 + "espinhos3.png";
+        const imgEspinhosBase = new Image(); imgEspinhosBase.src = pathUsoGeral + "espinhos.png";
+        const imgEspinhosInv = new Image(); imgEspinhosInv.src = pathUsoGeral + "espinhos_inv.png";
+        const imgPilarTriploEspinhos = new Image();
+        imgPilarTriploEspinhos.src = pathUsoGeral + "pilartriplo_espinhos.png";
+        
+        // === NOVO SPRITE DE DECORAÇÃO ===
+            const imgPlaca1 = new Image();
+            imgPlaca1.src = pathUsoGeral + "placa1.png";
+
+        const imgPilarTriploInvEspinhos = new Image();
+        imgPilarTriploInvEspinhos.src = pathUsoGeral + "pilartriplo_inv_espinhos.png"
+
+                // === SPRITES DO CUBO DE ATIVAÇÃO ===
+        const imgCuboAtivacaoNormal = new Image();
+        imgCuboAtivacaoNormal.src = "levels/usogeral/cubo_m3.png";
+
+        const imgCuboAtivacaoHit = new Image();
+        imgCuboAtivacaoHit.src = "levels/usogeral/cubo_m2.png";
+
+        const imgCuboAtivacaoFinal = new Image();
+        imgCuboAtivacaoFinal.src = "levels/usogeral/cubo_m1.png";
+
+                // === SPRITES DO ZEPPELIN (animação) ===
+        const imgsZeppelin = [];
+        for (let i = 1; i <= 5; i++) {
+            const img = new Image();
+            img.src = `levels/usogeral/zpl${i}.png`;   // ajuste o caminho se necessário
+            imgsZeppelin.push(img);
+        }
+
+
+        const imgcatStand = new Image(); imgcatStand.src = "sprites_cat/stand_1/stand_rb1.png";
+        const imgJump1 = new Image(); imgJump1.src = "sprites_cat/jump/jump_mv1.png";
+        const imgJump2 = new Image(); imgJump2.src = "sprites_cat/jump/jump_mv2.png";
+
+        const imgsRun = [];
+        const nomesCorrida = ["run_rb__0009_Camada-1.png", "run_rb__0008_Camada-2.png", "run_rb__0007_Camada-3.png", "run_rb__0006_Camada-4.png", "run_rb__0005_Camada-5.png", "run_rb__0004_Camada-6.png", "run_rb__0003_Camada-7.png", "run_rb__0002_Camada-8.png", "run_rb__0001_Camada-9.png", "run_rb__0000_Camada-10.png"];
+        nomesCorrida.forEach(n => { const i = new Image(); i.src = `sprites_cat/run_1/${n}`; imgsRun.push(i); });
+
+        // --- IMAGEM PARA O FADE ---
+            const imgPreta = new Image();
+            imgPreta.src = "levels/usogeral/preto.png"; // Certifique-se de que o nome seja este no seu GitHub  
+
+        // --- CONFIGURAÇÃO DA CAPA ---
+            let gameState = "menu"; // O jogo começa no estado de menu
+            const imgCapa = new Image();
+            imgCapa.src = "levels/usogeral/capa.png"; // Caminho da sua imagem
+
+        let mostrarControles = false; // Começa desligada, ligaremos ao entrar no jogo
+            const imgControles = new Image();
+            imgControles.src = "levels/usogeral/controls.png";  
+            
+            // --- CARREGAMENTO DE SONS ---
+
+                            // === SFX DE RESPAWN DOS NFTs ===
+                const sfxNftRespawn = new Audio("sounds/nftrespaw.mp3");
+                sfxNftRespawn.preload = "auto";
+                sfxNftRespawn.volume = 0.6;   // Ajuste o volume se necessário
+
+                const sfxPulo = new Audio("sounds/jump2.mp3"); // Caminho atualizado
+                sfxPulo.preload = "auto"; // Força o navegador a baixar o som antes de começar
+                sfxPulo.volume = 0.2; // Ajuste o volume para não ficar estourado
+
+                const sfxDanoFisico = new Audio("sounds/sfx_dano_fisico_comun.mp3");
+                    sfxDanoFisico.preload = "auto";
+                    sfxDanoFisico.volume = 0.3;
+
+                    const sfxDanoEletrico = new Audio("sounds/sfx_dano_asteeletrica.mp3");
+                    sfxDanoEletrico.preload = "auto";
+                    sfxDanoEletrico.volume = 0.3;
+
+                   // NOVO: Som específico do Minibear
+                    const sfxHitMinibear = new Audio("sounds/sfx_hitdo_minibear.mp3");
+                    sfxHitMinibear.preload = "auto";
+                    sfxHitMinibear.volume = 0.3;   // Ajuste o volume se necessário 
+
+                    // === SFX DO MINIBEAR TOMANDO DANO ===
+                        const sfxHitNoMinibear = new Audio("sounds/sfx_hit_nominibear3.mp3");
+                        sfxHitNoMinibear.preload = "auto";
+                        sfxHitNoMinibear.volume = 0.5;   // Ajuste o volume se quiser
+
+                // === SFX DE MORTE DOS NFTs ===
+                    const sfxDanoNoNFT = new Audio("sounds/sft_dano_no_nftw.mp3");
+                    sfxDanoNoNFT.preload = "auto";
+                    sfxDanoNoNFT.volume = 0.3;   // Ajuste o volume conforme necessário
+
+                // === SFX DE TREMOR / TERREMOTO ===
+                    const sfxTremor = new Audio("sounds/earth-rumble.mp3");
+                    sfxTremor.preload = "auto";
+                    sfxTremor.volume = 1;        // Ajuste o volume (0.3 ~ 0.6 costuma ficar bom)
+                    sfxTremor.loop = false;        // Não loopar automaticamente   
+                    
+                // === SFX DE JAULA ABRINDO (CUTSCENE FINAL) ===
+                    const sfxOpenDoor = new Audio("sounds/opendoor.mp3");
+                    sfxOpenDoor.preload = "auto";
+                    sfxOpenDoor.volume = 0.7;   // Ajuste o volume se necessário   
+                    
+                // === SFX DO PILAR SUBINDO (CUTSCENE ARENA) ===
+                    const sfxPilarDrag = new Audio("sounds/pilarsfxdrag.mp3");
+                    sfxPilarDrag.preload = "auto";
+                    sfxPilarDrag.volume = 0.5;   // Ajuste o volume conforme necessário
+                    sfxPilarDrag.loop = true;     // Loop enquanto o pilar estiver se movendo  
+                    sfxPilarDrag.playing = false; // flag para controlar o som
+                    
+                                // === SFX DE TEXTO FALADO ===
+                                    const sfxTexto = new Audio("sounds/sfx_txt.mp3");
+                                    sfxTexto.preload = "auto";
+                                    sfxTexto.volume = 0.2;    
+
+                                // === SFX DO PILAR DESCENDO (ativado pelo cubo) ===
+                const sfxPilarDrag2 = new Audio("sounds/pilarsfxdrag2.mp3");
+                sfxPilarDrag2.preload = "auto";
+                sfxPilarDrag2.volume = 0.6;
+                sfxPilarDrag2.loop = true;
+                sfxPilarDrag2.playing = false;                    
+
+        // --- CONFIGURAÇÃO DA TRILHA SONORA ---
+             const bgmLevel1 = new Audio("sounds/musictrack1_level1.mp3");
+            bgmLevel1.loop = true; // Faz a música recomeçar automaticamente
+            bgmLevel1.volume = 0.35; // Ajusta o volume para 40% (para não abafar os efeitos)
+
+            // === TRILHA SONORA DA ARENA (BOSS FIGHT) ===
+                const bgmArena = new Audio("sounds/sfx_arena.mp3");
+                bgmArena.loop = true;
+                bgmArena.volume = 0.3;   // Ajuste o volume aqui (0.3 ~ 0.7 costuma ficar bom)
+
+            // --- SONS DE EFEITO E INTERFACE ---
+                const sfxGameOver = new Audio("sounds/gameover_sound.mp3");
+                sfxGameOver.volume = 0.6; // Volume um pouco mais alto que a música de fundo
+
+        //minibear ciborg 
+        const pathBoss = "sprites_inimigos/bearcibv1/";
+        const imgsMiniBear = [];
+        for (let i = 1; i <= 8; i++) {
+            const img = new Image(); img.src = `${pathBoss}bcq${i}.png`; imgsMiniBear.push(img);
+        }
+
+        // --- SPRITES NOVO INIMIGO: NFTWITE ---
+            const pathNft = "sprites_inimigos/nfts/nft_whitev1/";
+
+            const imgsNftWalk = [];
+            for (let i = 1; i <= 6; i++) {
+                const img = new Image(); img.src = `${pathNft}walk/wnft_walk_q${i}.png`; imgsNftWalk.push(img);
+            }
+
+            const imgsNftAtk = [];
+            const nomesAtk = ["Camada-1", "Camada-2", "Camada-3", "Camada-4", "Camada-5", "Camada-6"];
+            nomesAtk.forEach(n => {
+                const img = new Image(); img.src = `${pathNft}walkatack/atkwalk_0000s_000${6 - imgsNftAtk.length - 1}_${n}.png`; imgsNftAtk.push(img);
+            }); // Nota: Ajustei o mapeamento para bater com seus nomes de 0005 a 0000
+
+            const imgsNftDeath = [];
+            const nomesDeath = ["Camada-1", "Camada-2", "Camada-3", "Camada-4", "Camada-5", "Camada-6", "Camada-7"];
+            nomesDeath.forEach(n => {
+                const img = new Image(); img.src = `${pathNft}death/wnftdt_000${6 - imgsNftDeath.length}_${n}.png`; imgsNftDeath.push(img);
+            });
+
+            // --- SPRITES IDLENFTWITE (VIGIA) ---
+                const imgsIdleNft = [];
+                const nomesIdle = ["widle_0000s_0003_1", "widle_0000s_0002_2", "widle_0000s_0001_3", "widle_0000s_0000_4"];
+                nomesIdle.forEach(n => {
+                    const img = new Image(); img.src = `${pathNft}widle/${n}.png`; imgsIdleNft.push(img);
+                });
+
+                const imgsIdleNftAtk = [];
+                for (let i = 1; i <= 6; i++) {
+                    const img = new Image(); img.src = `${pathNft}widleatack/widleatk_${i}.png`; imgsIdleNftAtk.push(img);
+                }
+
+                // --- NOVOS SPRITES DO FINAL ---
+                    const imgJaula1 = new Image(); imgJaula1.src = "sprites_cat/jaula/jlfechada1.png";
+                    const imgJaula2 = new Image(); imgJaula2.src = "sprites_cat/jaula/jlfechada2.png";
+                    const imgFinalCreditos = new Image(); imgFinalCreditos.src = "levels/usogeral/final2.png";
+
+                    // Controle da Cutscene Final
+                    let jaulaAtual = imgJaula1;
+                    let cutsceneFinalAtiva = false;
+                    let cutsceneFinalStep = 0; // 0:espera 1s, 1:anda, 2:pula, 3:fade, 4:tela final
+                    let fadePretoAlpha = 0;
+                    let finalFadeAlpha = 0;
+                    let timerFinal = 0;
+
+                      // === CUTSCENE INICIAL - PARTE 1 ===
+                        let cutsceneInicialAtiva = false;
+                        let cutsceneInicialStep = 0;
+                        let timerCutsceneInicial = 0;
+                        let cutsceneInicialJaRodou = false;   // ← NOVA FLAG
+
+                        // Bear parado no mundo
+                        let bearMotoWorldX = 1842;
+                        let bearMotoWorldY = 540;   // ajuste o Y se necessário      
+
+        // --- ENTIDADES DE PERIGO ---
+        const entidadesPerigo = [
+            { x: 13916, y: 515, w: 45, h: 45, frame: 0, timer: 0, tipo: "eletrico" },
+            { x: 16400, y: 615, w: 45, h: 45, frame: 0, timer: 0, tipo: "eletrico" },
+            { x: 20500, y: 514, w: 45, h: 45, frame: 0, timer: 0, tipo: "eletrico" },
+            { x: 21762, y: 150, w: 45, h: 45, frame: 0, timer: 0, tipo: "eletricoDireito" },
+            { x: 21762, y: 220, w: 45, h: 45, frame: 0, timer: 0, tipo: "eletricoDireito" },
+            { x: 22155, y: 400, w: 45, h: 45, frame: 0, timer: 0, tipo: "eletricoEsquerdo" },
+            { x: 22155, y: 580, w: 45, h: 45, frame: 0, timer: 0, tipo: "eletricoEsquerdo" },
+            { x: 22479, y: 98, w: 45, h: 45, frame: 0, timer: 0, tipo: "eletricoEsquerdo" },
+            { x: 21762, y: 220, w: 45, h: 45, frame: 0, timer: 0, tipo: "eletricoDireito" },
+        ];
+
+        // --- MAPEAMENTO DO CENÁRIO ---
+        const mapa = [
+            // SETOR 1 - ÁREA INICIAL (Pisos de Metal)
+            { x: 0, y: 680, w: 1550, h: 40, setor: 1, tipo: "chao" },
+            { x: 1800, y: 680, w: 1250, h: 40, setor: 1, tipo: "chao" },
+                        // === DESAFIO 3400 ~ 5200 - "CORREDOR DAS PLATAFORMAS MÓVEIS" ===
+            { x: 3300, y: 680, w: 4049 - 3300 - 5, h: 40, tipo: "chao", setor: 1 },
+            { x: 4049 + 76 + 5, y: 680, w: 4402 - (4049 + 76 + 5) - 5, h: 40, tipo: "chao", setor: 1 },
+            { x: 4402 + 76 + 5, y: 680, w: 4955 - (4402 + 76 + 5) - 5, h: 40, tipo: "chao", setor: 1 },
+           
+            { x: 4955 , y: 680, w: 300, h: 40, tipo: "chao", setor: 1 },
+            
+            // Plataformas flutuantes em alturas diferentes (obrigam salto preciso)
+            { x: 3550, y: 520, w: 220, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 3850, y: 420, w: 180, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 4150, y: 550, w: 250, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 4480, y: 380, w: 160, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            //{ x: 4750, y: 490, w: 200, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+
+            
+            // Obstáculos / Pilares para forçar pulos maiores
+            { x: 4049, y: 380, w: 76, h: 500, tipo: "obstaculo", sprite: imgPilarTriplo },
+            { x: 4402, y: 380, w: 76, h: 500, tipo: "obstaculo", sprite: imgPilarTriplo },
+            { x: 4955, y: -1, w: 76, h: 500, tipo: "obstaculo", sprite: imgPilarTriploInv },
+            { x: 4955, y: 510, w: 76, h: 540, tipo: "obstaculo", sprite: imgPilarTriploEspinhos },
+            { x: 4473, y: 440, w: 56, h: 56, tipo: "ativacao", objeto: new CuboAtivacao( 4473, 440) },
+            // Inimigo vigiando o final do desafio
+            // (adicione no array inimigosComuns)
+
+            // SETOR 2 - ZONA DE DESAFIOS (Pisos de Concreto/Setor 2)
+            { x: 6255, y: 415, w: 130, h: 175, tipo: "decoracao", sprite: imgPlaca1 },
+            { x: 5550, y: 580, w: 5300, h: 140, setor: 2, tipo: "chao" },
+            { x: 10797, y: 528, w: 56, h: 56, setor: 2, tipo: "obstaculo", sprite: imgCubo },
+            { x: 10850, y: 680, w: 350, h: 40, tipo: "dano", sprite: imgEspinhos2 },
+            { x: 11185, y: 540, w: 74, h: 180, tipo: "obstaculo", sprite: imgPilar2 },
+
+            // SETOR 3 - TRANSIÇÃO E PLATAFORMAS
+            { x: 11248, y: 680, w: 2000, h: 40, tipo: "chao", setor: 1 },
+            { x: 13254, y: 680, w: 350, h: 40, tipo: "dano", sprite: imgEspinhos3 },
+            { x: 13463, y: 580, w: 1000, h: 140, tipo: "chao", sprite: imgPlataformaS2 },
+            { x: 14463, y: 680, w: 150, h: 40, tipo: "dano", sprite: imgEspinhos2 },
+            { x: 14613, y: 580, w: 650, h: 140, tipo: "chao", setor: 2, sprite: imgPlataformaS2 },
+            { x: 15263, y: 680, w: 400, h: 40, tipo: "dano", sprite: imgEspinhos2 },
+
+            // SETOR 4 - ESCADA FLUTUANTE E PILARES
+            { x: 15663, y: 540, w: 74, h: 180, tipo: "obstaculo", sprite: imgPilar2 },
+            { x: 15413, y: 540, w: 250, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 15787, y: 540, w: 250, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 16107, y: 540, w: 250, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 16407, y: 680, w: 400, h: 40, tipo: "chao", setor: 1, sprite: imgPlataformaS1 },
+            { x: 16807, y: 680, w: 743, h: 40, tipo: "dano", sprite: imgEspinhos2 },
+
+            // ESCADA ASCENDENTE (COMPLEXO DE PILARES)
+            { x: 16973, y: 576, w: 74, h: 180, tipo: "decoracao", sprite: imgPilar2 },
+            { x: 16885, y: 550, w: 250, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 17079, y: 499, w: 56, h: 56, tipo: "obstaculo", sprite: imgCubo },
+            { x: 17173, y: 434, w: 76, h: 500, tipo: "obstaculo", sprite: imgPilarTriplo },
+            { x: 17085, y: 420, w: 250, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 17373, y: 308, w: 76, h: 500, tipo: "obstaculo", sprite: imgPilarTriplo },
+            { x: 17285, y: 290, w: 250, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+
+            // SETOR 5 - ESTRUTURA CENTRAL (ESTAÇÃO)
+            { x: 17650, y: 580, w: 800, h: 140, tipo: "plataforma", setor: 2, sprite: imgPlataformaS2 },
+            { x: 17650, y: 440, w: 600, h: 140, tipo: "plataforma", setor: 2, sprite: imgPlataformaS2 },
+            { x: 17650, y: 300, w: 400, h: 140, tipo: "plataforma", setor: 2, sprite: imgPlataformaS2 },
+            { x: 17650, y: 248, w: 56, h: 56, tipo: "obstaculo", sprite: imgCubo },
+
+            // DESAFIO FINAL (CAMINHO DE ESPINHOS E SALTOS)
+            { x: 18450, y: 680, w: 1200, h: 40, tipo: "dano", sprite: imgEspinhos2 },
+            { x: 18961, y: 505, w: 76, h: 500, tipo: "obstaculo", sprite: imgPilarTriplo },
+            { x: 18870, y: 480, w: 250, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 19337, y: 343, w: 76, h: 500, tipo: "obstaculo", sprite: imgPilarTriplo },
+            { x: 19250, y: 320, w: 250, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 19733, y: 476, w: 76, h: 500, tipo: "obstaculo", sprite: imgPilarTriplo },
+            { x: 19650, y: 450, w: 250, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 20128, y: 345, w: 76, h: 500, tipo: "obstaculo", sprite: imgPilarTriplo },
+            { x: 20050, y: 320, w: 250, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 20500, y: 580, w: 1000, h: 140, tipo: "chao", setor: 2, sprite: imgPlataformaS2 },
+            { x: 21444, y: 529, w: 56, h: 56, tipo: "obstaculo", sprite: imgCubo },
+
+            // ÁREA DO PILAR INVERTIDO (TETO)
+            { x: 21700, y: 0, w: 74, h: 180, tipo: "obstaculo", sprite: imgPilarInvertido },
+            { x: 21700, y: 180, w: 74, h: 180, tipo: "obstaculo", sprite: imgPilarInvertido },
+            { x: 21708, y: 360, w: 250, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+
+            // FINAL DO MAPAc
+            { x: 21600, y: 680, w: 600, h: 40, tipo: "dano", sprite: imgEspinhos2 },
+            { x: 21623, y: 630, w: 250, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 22000, y: 489, w: 250, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 22265, y: 489, w: 150, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 22211, y: 550, w: 74, h: 180, tipo: "obstaculo", sprite: imgPilar2 },
+            { x: 22211, y: 200, w: 74, h: 180, tipo: "decoracao", sprite: imgPilar2 },
+            { x: 22211, y: 370, w: 74, h: 180, tipo: "obstaculo", sprite: imgPilar2 },
+
+
+            { x: 22120, y: 207, w: 250, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+
+            { x: 22465, y: 655, w: 125, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 22577, y: 550, w: 74, h: 180, tipo: "obstaculo", sprite: imgPilar2 },
+            { x: 22577, y: 370, w: 74, h: 180, tipo: "decoracao", sprite: imgPilar2 },
+
+            { x: 22643, y: 680, w: 200, h: 40, tipo: "dano", sprite: imgEspinhos2 },
+            { x: 22534, y: 0, w: 74, h: 180, tipo: "obstaculo", sprite: imgPilarInvertido },
+
+            { x: 23906, y: 100, w: 770, h: 140, tipo: "plataforma", sprite: imgPlataformaS2Inv },
+            { x: 22857, y: 0, w: 2450, h: 140, tipo: "plataforma", sprite: imgPlataformaS2Inv },
+            { x: 24005, y: 240, w: 590, h: 20, tipo: "dano", sprite: imgEspinhosInv },
+            { x: 22857, y: 580, w: 1200, h: 140, tipo: "plataforma", setor: 2, sprite: imgPlataformaS2 },
+            { x: 22857, y: 440, w: 1000, h: 140, tipo: "plataforma", setor: 2, sprite: imgPlataformaS2 },
+            { x: 22857, y: 300, w: 800, h: 140, tipo: "plataforma", setor: 2, sprite: imgPlataformaS2 },
+            { x: 24208, y: 448, w: 180, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+            { x: 24060, y: 680, w: 60, h: 50, tipo: "dano", sprite: imgEspinhos2 },
+            { x: 24425, y: 680, w: 60, h: 50, tipo: "dano", sprite: imgEspinhos2 },
+            { x: 24490, y: 581, w: 56, h: 210, tipo: "obstaculo", sprite: imgCuboV2 },
+            { x: 24545, y: 580, w: 1200, h: 140, tipo: "plataforma", setor: 2, sprite: imgPlataformaS2 },
+            { x: 24754, y: 310, w: 985, h: 140, tipo: "plataforma", setor: 2, sprite: imgPlataformaS2 },
+            { x: 24850, y: 140, w: 440, h: 30, tipo: "dano", sprite: imgEspinhosInv },
+            { x: 24650, y: 440, w: 1090, h: 140, tipo: "plataforma", setor: 2, sprite: imgPlataformaS2 },
+            { x: 24758, y: 550, w: 74, h: 180, tipo: "obstaculo", sprite: imgPilar2 },
+            { x: 24758, y: 370, w: 74, h: 180, tipo: "obstaculo", sprite: imgPilar2 },
+            { x: 24766, y: 314, w: 56, h: 56, tipo: "obstaculo", sprite: imgCubo },
+
+            // --- SETOR 6: ASCENSÃO FINAL ---
+            // --- SETOR 6: ESCADA DE CUBOS (DESCIDA - BLOCOS INDIVIDUAIS) ---
+            // Coluna 1 (Topo - Conecta com a plataforma do Setor 5)
+            // --- SETOR 6: ESCADA DE CUBOS CORRIGIDA ---
+                        // === ESCADA DE CUBOS - COLUNA 1 ===
+            { x: 25740 + (56 * 2), y: 384, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25740 + (56 * 2), y: 440, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25740 + (56 * 2), y: 496, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25740 + (56 * 2), y: 552, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25740 + (56 * 2), y: 608, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25740 + (56 * 2), y: 664, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+
+            // === COLUNA 2 ===
+            { x: 25796 + (56 * 2), y: 384, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25796 + (56 * 2), y: 440, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25796 + (56 * 2), y: 496, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25796 + (56 * 2), y: 552, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25796 + (56 * 2), y: 608, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25796 + (56 * 2), y: 664, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+
+            // === COLUNA 3 ===
+            { x: 25852 + (56 * 4), y: 440, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25852 + (56 * 4), y: 496, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25852 + (56 * 4), y: 552, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25852 + (56 * 4), y: 608, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25852 + (56 * 4), y: 664, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+
+            { x: 25908 + (56 * 4), y: 440, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25908 + (56 * 4), y: 496, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25908 + (56 * 4), y: 552, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25908 + (56 * 4), y: 608, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25908 + (56 * 4), y: 664, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+
+            // === COLUNA 4 ===
+            { x: 25964 + (56 * 6), y: 496, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25964 + (56 * 6), y: 552, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25964 + (56 * 6), y: 608, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 25964 + (56 * 6), y: 664, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+
+            { x: 26020 + (56 * 6), y: 496, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 26020 + (56 * 6), y: 552, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 26020 + (56 * 6), y: 608, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 26020 + (56 * 6), y: 664, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+
+            // === COLUNA 5 ===
+            { x: 26076 + (56 * 8), y: 552, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 26076 + (56 * 8), y: 608, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 26076 + (56 * 8), y: 664, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+
+            { x: 26132 + (56 * 8), y: 552, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 26132 + (56 * 8), y: 608, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 26132 + (56 * 8), y: 664, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+
+            // === COLUNA 6 ===
+            { x: 26188 + (56 * 10), y: 608, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 26188 + (56 * 10), y: 664, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+
+            { x: 26188 + 56 + (56 * 10), y: 608, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 26188 + 56 + (56 * 10), y: 664, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+
+            // === BASE ===
+            { x: 26188 + 112 + (56 * 12), y: 664, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+            { x: 26188 + 168 + (56 * 12), y: 664, w: 56, h: 61, tipo: "obstaculo", sprite: imgCubo },
+
+            // caminho para arena
+            { x: 27084, y: 680, w: 600, h: 40, setor: 1, tipo: "chao" },
+
+            // pilares  tranca animados
+            { x: 27084 + 601, y: 680, w: 74, h: 540, tipo: "obstaculo", sprite: imgPilarTriplo },
+
+            // chao arena 
+            { x: 27084 + 676, y: 680, w: 1160, h: 40, setor: 1, tipo: "chao" },
+            { x: 28168, y: 448, w: 250, h: 30, tipo: "flutuante", sprite: imgPltFlutuante },
+
+            // pilares final arena tranca animados
+            { x: 28900, y: 190, w: 74, h: 540, tipo: "obstaculo", sprite: imgPilarTriplo },
+
+        ];
+
+                // === ZEPPELINS VOANDO (vários espalhados + reaparecem) ===
+                    parallaxFlyingObjects.push({ x: 2000, y: 140, speed: 0.35, frame: 0, timer: 0, imgs: imgsZeppelin, w: 320, h: 140, direction: -1 });
+                    parallaxFlyingObjects.push({ x: 6500, y: 90, speed: 0.32, frame: 0, timer: 0, imgs: imgsZeppelin, w: 320, h: 140, direction: -1 });
+                    parallaxFlyingObjects.push({ x: 11000, y: 180, speed: 0.38, frame: 0, timer: 0, imgs: imgsZeppelin, w: 320, h: 140, direction: -1 });
+                    parallaxFlyingObjects.push({ x: 17000, y: 110, speed: 0.34, frame: 0, timer: 0, imgs: imgsZeppelin, w: 320, h: 140, direction: -1 });
+                    parallaxFlyingObjects.push({ x: 23000, y: 150, speed: 0.36, frame: 0, timer: 0, imgs: imgsZeppelin, w: 320, h: 140, direction: -1 });
+                    parallaxFlyingObjects.push({ x: 29000, y: 80, speed: 0.33, frame: 0, timer: 0, imgs: imgsZeppelin, w: 320, h: 140, direction: -1 });
+
+        const cat = {
+            worldX: 332, currentX: 332, y: 100, largura: 50, altura: 100,
+            velX: 0, velY: 0, gravidadeSubida: 0.35, gravidadeQueda: 0.55,
+            forcaPuloBase: -11, estaNoChao: false, tempoNoAr: 0,
+            estado: "parado", direcao: 1, frameAtual: 0, contadorDeTempo: 0, atrasoAnimacao: 10,
+            boostAtivo: false, rastros: []
+        };
+
+                // === AJUSTES NO PULO NORMAL ===
+        cat.forcaPuloBase = -11.1;     // reduzido ≈ 15% (era -13)
+        cat.gravidadeSubida = 0.34;    // um pouco mais "pesado" na subida
+        cat.gravidadeQueda = 0.48;     // queda um pouco mais natural
+
+        const miniBear = {
+            x: 28740, y: 566, w: 78, h: 120,
+            velX: velMaxBase * 0.55,
+            vida: 2, morto: false,
+            direcao: -1, frame: 0, timerAnim: 0,
+            emDash: false, cooldownDano: 0,
+            timerMorte: 0,
+            timerRastro: 0,
+            rastros: [],
+            // --- CONTROLE DE ONDAS ---
+            ondaAtual: 1,
+            totalOndas: 3,
+        };
+
+        sfxPilarDrag.playing = false; // flag para controlar o som
+        
+        function renascerMinibear() {
+            miniBear.ondaAtual++;
+            miniBear.x = 28740;
+            miniBear.y = 566;
+            miniBear.vida = 2;
+            miniBear.timerMorte = 0; // Garante que o timer zere para o novo boss
+            miniBear.morto = false;
+            miniBear.cooldownDano = 0;
+            miniBear.rastros = [];
+
+            // Cada onda fica 10% mais rápida que a anterior
+            miniBear.velX = (velMaxBase * (0.4 + (miniBear.ondaAtual * 0.1))) * -1;
+        }
+
+        // --- LISTENERS DE MOUSE ---
+                canvas.addEventListener("mousedown", (e) => {
+                        mouseIsPressed = true;
+                        const rect = canvas.getBoundingClientRect();
+                        mouseWorldX = Math.floor((e.clientX - rect.left) + scrollX);
+                        mouseWorldY = Math.floor(e.clientY - rect.top);
+
+                        // PULAR CUTSCENE COM CLIQUE
+                        if (cutsceneInicialAtiva) {
+                            bearMotoWorldX = 2500;
+                            cutsceneInicialStep = 5;
+                            popupAlpha = 0;
+                            sfxTexto.pause();
+                            sfxTexto.currentTime = 0;
+                            console.log("Cutscene pulada pelo jogador");
+                        }
+                    });
+
+                    canvas.addEventListener("mouseup", () => {
+                        mouseIsPressed = false;
+                    });
+
+                canvas.addEventListener("mousedown", (e) => {
+                        const rect = canvas.getBoundingClientRect();
+                        const mouseX = e.clientX - rect.left;
+                        const mouseY = e.clientY - rect.top;
+
+                        mouseWorldX = Math.floor(mouseX + scrollX);
+                        mouseWorldY = Math.floor(mouseY);
+
+                        mouseIsPressed = true;
+                        mouseButton = e.button;
+
+                        // === CLIQUE NO MENU TELEPORTE ===
+                        if (exibindoMenuTeleporte && e.button === 0) {
+                            const menuW = 500;
+                            const menuH = 300;
+                            const menuX = canvas.width / 2 - menuW / 2;
+                            const menuY = canvas.height / 2 - menuH / 2;
+                            const areaY = menuY + 70;
+
+                            const setores = menuDebug.pontos[menuDebug.faseSelecionada];
+
+                            for (let i = 0; i < setores.length; i++) {
+                                const itemY = areaY + (i * alturaItem) - scrollMenu;
+                                if (mouseX > menuX && mouseX < menuX + menuW &&
+                                    mouseY > itemY && mouseY < itemY + alturaItem) {
+                                    executarTeleporte(setores[i]);
+                                    return;
+                                }
+                            }
+                        }
+
+                        // Clique para pular cutscene inicial
+                        if (cutsceneInicialAtiva) {
+                            bearMotoWorldX = 2500;
+                            cutsceneInicialStep = 5;
+                            popupAlpha = 0;
+                            sfxTexto.pause();
+                        }
+
+                        // Ferramenta de edição
+                        if (ferramentaEdicaoAtiva && !exibindoMenuTeleporte) {
+                            if (e.button === 0) {
+                                const obj = catalogoEdicao[pincelAtual];
+                                console.log(`{ x: ${mouseWorldX}, y: ${mouseWorldY}, w: ${obj.w}, h: ${obj.h}, tipo: "${obj.tipo}", sprite: ${obj.sprite} },`);
+                            } else if (e.button === 2) {
+                                e.preventDefault();
+                                cat.worldX = mouseWorldX;
+                                cat.y = mouseWorldY - 100;
+                                cat.velX = 0;
+                                cat.velY = 0;
+                            }
+                        }
+                    });
+
+        // Bloqueia o menu do botão direito apenas quando necessário
+        window.oncontextmenu = (e) => {
+            if (ferramentaEdicaoAtiva || exibindoMenuTeleporte) return false;
+        };
+
+        canvas.addEventListener("wheel", (e) => {
+            if (!exibindoMenuTeleporte) return;
+            e.preventDefault();
+            scrollMenu += e.deltaY > 0 ? 30 : -30;
+            const setores = menuDebug.pontos[menuDebug.faseSelecionada];
+            const limiteMax = Math.max(0, (setores.length * alturaItem) - 220);
+            scrollMenu = Math.max(0, Math.min(scrollMenu, limiteMax));
+        }, { passive: false });
+
+        function verificarIntersecao(r1, r2) { return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y; }
+
+             function executarTeleporte(destino) {
+                    cat.worldX = destino.x;
+                    cat.y = destino.y;
+                    cat.velX = 0;
+                    cat.velY = 0;
+                    cat.boostAtivo = false;
+
+                    let alvoScroll = cat.worldX - pontoMortoX;
+                    scrollX = Math.max(0, alvoScroll);
+
+                    ultimoCheckpoint = { x: destino.x, y: destino.y };
+
+                    // Libera tudo
+                    exibindoMenuTeleporte = false;
+                    controlesBloqueados = false;
+                    emCutscene = false;
+
+                    console.log(`Teleporte para ${destino.nome} concluído`);
+                }          
+
+        window.addEventListener("keydown", (e) => {
+                // 1. Se estiver na capa (Menu), Espaço inicia o jogo e LIGA os controles
+                if (gameState === "menu") {
+                    if (e.code === "Space") {
+                        gameState = "jogando";
+                        bgmLevel1.play();
+                        mostrarControles = true; // Ativa a imagem de controles agora  
+                    }
+                    return;
+                }
+
+                // 2. Se os controles estiverem na tela, qualquer tecla os remove
+                if (mostrarControles) {
+                    mostrarControles = false;
+                    return;
+                }
+            if (emCutscene) return;
+            if (e.key === "F7") { e.preventDefault(); ferramentaEdicaoAtiva = !ferramentaEdicaoAtiva; return; }
+                                    if (e.key === "F8") {
+                e.preventDefault();
+                exibindoMenuTeleporte = !exibindoMenuTeleporte;
+
+                if (exibindoMenuTeleporte) {
+                    indiceSelecaoMenu = 0;
+                    scrollMenu = 0;
+                    controlesBloqueados = true;   // bloqueia enquanto menu aberto
+                } else {
+                    controlesBloqueados = false;  // libera ao fechar
+                    emCutscene = false;
+                }
+                return;
+            }
+                        if (e.key.toLowerCase() === "h") {
+                debugHitboxes = !debugHitboxes;
+                console.log("Hitboxes " + (debugHitboxes ? "LIGADAS" : "DESLIGADAS"));
+                return;
+            }
+
+            // ... (lógica de menu e debug que já existe)
+
+            // Se o jogo estiver rolando e não estivermos em cutscene/gameover
+            if (e.code === "Space" && cat.estaNoChao) {
+                // 1. Reset e Play no som jump2.mp3
+                sfxPulo.currentTime = 0;
+                sfxPulo.play().catch(err => console.log("Aguardando interação para áudio"));
+
+                // 2. Física do Pulo
+                cat.velY = cat.forcaPuloBase;
+                cat.estaNoChao = false;
+
+                // 3. Feedback visual (opcional)
+                cat.estado = "pulando";
+            }
+
+                        // === MENU TELEPORTE F8 ===
+            if (e.key === "F8") {
+                e.preventDefault();
+
+                exibindoMenuTeleporte = !exibindoMenuTeleporte;
+
+                if (exibindoMenuTeleporte) {
+                    indiceSelecaoMenu = 0;
+                    scrollMenu = 0;
+                } else {
+                    // Libera tudo ao fechar
+                    controlesBloqueados = false;
+                    emCutscene = false;
+                }
+                return;
+            }
+            if (emCutscene || gameOver) return;
+
+            if (e.key === "F7") {
+                e.preventDefault();
+                ferramentaEdicaoAtiva = !ferramentaEdicaoAtiva;
+                return;
+            }
+
+            if (gameOver || controlesBloqueados || aguardandoResetInput) return;
+
+            const tecla = e.key.toLowerCase();
+            const agora = Date.now();
+            // --- O PORTÃO DE ENTRADA ---
+            if (gameState === "menu") {
+                desenharCapa(); // Chama a função que desenha a imagem
+                requestAnimationFrame(loop); // Mantém o motor rodando
+                return; // IMPORTANTE: Impede que o robô caia ou inimigos se movam
+            }
+            if (tecla === "d" || tecla === "a") {
+                if (tecla === ultimaTeclaSolta && (agora - tempoUltimaSoltura) < intervaloDoubleTap) { cat.boostAtivo = true; cat.atrasoAnimacao = 5; }
+                if (tecla === "d") { movendoDireita = true; cat.direcao = 1; }
+                if (tecla === "a") { movendoEsquerda = true; cat.direcao = -1; }
+                ultimaTeclaSolta = "";
+            }
+            if (e.code === "Space" && (cat.estaNoChao || cat.tempoNoAr < 6)) {
+                // Reinicia e toca imediatamente
+                sfxPulo.pause();
+                sfxPulo.currentTime = 0;
+                sfxPulo.play().catch(err => console.log("Aguardando interação: ", err));
+
+                cat.velY = cat.forcaPuloBase * (cat.boostAtivo ? 1.2 : 1.0);
+                cat.estaNoChao = false;
+                cat.tempoNoAr = 10;
+            }
+            // Seleção de Pincel (Teclas 1 a 5) no modo Edição
+            if (ferramentaEdicaoAtiva && !isNaN(e.key) && e.key > 0 && e.key <= catalogoEdicao.length) {
+                pincelAtual = parseInt(e.key) - 1;
+                console.log(`Pincel alterado para: ${catalogoEdicao[pincelAtual].nome}`);
+            }
+
+            if (e.key.toLowerCase() === "g") {
+                godMode = !godMode;
+                console.log("%c[DEBUG] God Mode: " + (godMode ? "ATIVADO" : "DESATIVADO"),
+                    "color: " + (godMode ? "#00ff00" : "#ff0000") + "; font-weight: bold;");
+                return;
+            }
+            if (e.key.toLowerCase() === "1") {
+                if (bgmLevel1.paused) {
+                    bgmLevel1.play().catch(() => { });
+                    console.log("%c[ÁUDIO] Música do Level 1: LIGADA", "color: #00ff00; font-weight: bold;");
+                } else {
+                    bgmLevel1.pause();
+                    console.log("%c[ÁUDIO] Música do Level 1: DESLIGADA", "color: #ff9900; font-weight: bold;");
+                }
+            }
+            // --- COMANDO DE DEBUG: SIMULAR VITÓRIA NA ARENA ---
+            if (e.key.toLowerCase() === "v" && cenaArenaOcorreu) {
+                arenaConcluida = true;
+                console.log("%c[ARENA] Vitória! Câmera liberada.", "color: #00ffff; font-weight: bold;");
+            }
+
+        });
+
+        window.addEventListener("keyup", (e) => {
+            if (emCutscene) return;
+            const t = e.key.toLowerCase();
+            if (t === "d") movendoDireita = false;
+            if (t === "a") movendoEsquerda = false;
+            if (t === "d" || t === "a") {
+                aguardandoResetInput = false;
+                ultimaTeclaSolta = t;
+                tempoUltimaSoltura = Date.now();
+            }
+            if (!movendoDireita && !movendoEsquerda) { cat.boostAtivo = false; cat.atrasoAnimacao = 10; }
+        });
+
+        function aplicarDano(tipo = "fisico") {
+                if (godMode) return;
+
+                const agora = Date.now();
+                if (agora < tempoDano + duracaoInvulnerabilidade) return;
+
+                // Toca o som correto conforme o tipo de dano
+                if (tipo === "minibear") {
+                    sfxHitMinibear.currentTime = 0;
+                    sfxHitMinibear.play().catch(() => { });
+                }
+                else if (tipo === "eletrico") {
+                    sfxDanoEletrico.currentTime = 0;
+                    sfxDanoEletrico.play().catch(() => { });
+                }
+                else {
+                    // dano físico comum (inimigos normais, espinhos, queda, etc.)
+                    sfxDanoFisico.currentTime = 0;
+                    sfxDanoFisico.play().catch(() => { });
+                }
+
+                vida--;
+                tempoDano = agora;
+
+                if (vida <= 0) {
+                    vida = 0;
+                    gameOver = true;
+                    // Para todas as músicas
+                    bgmLevel1.pause();
+                    bgmLevel1.currentTime = 0;
+                    bgmArena.pause();           // ← NOVA LINHA
+                    bgmArena.currentTime = 0;   // ← NOVA LINHA
+
+                    sfxGameOver.play();
+                }
+            }
+                    // ==================== CUBO DE ATIVAÇÃO ====================
+                function CuboAtivacao(x, y) {
+            this.x = x;
+            this.y = y;
+            this.w = 56;
+            this.h = 56;
+            this.estado = "normal";
+            this.timerHit = 0;
+        }
+
+        CuboAtivacao.prototype.atualizar = function () {
+            if (this.estado === "hit") {
+                this.timerHit++;
+                if (this.timerHit > 8) {
+                    this.estado = "final";
+                    pilarEspinhosAtivado = true;   // Ativa o evento!
+                    console.log("Cubo ativado! Pilar de espinhos descendo...");
+                }
+            }
+        };
+
+        CuboAtivacao.prototype.desenhar = function () {
+            let img = imgCuboAtivacaoNormal;
+            if (this.estado === "hit") img = imgCuboAtivacaoHit;
+            else if (this.estado === "final") img = imgCuboAtivacaoFinal;
+
+            if (img && img.complete) {
+                ctx.drawImage(img, this.x, this.y, this.w, this.h);
+            }
+        };
+
+        class InimigoMinibear {
+            constructor(x, y, limiteEsq, limiteDir, velMult = 0.25) {
+                this.x = x;
+                this.y = y;
+                this.w = 78;
+                this.h = 120;
+                this.limiteEsq = limiteEsq;
+                this.limiteDir = limiteDir;
+                this.velBase = velMaxBase * velMult;
+                this.velX = this.velBase;
+                this.vida = 2;
+                this.morto = false;
+                this.direcao = 1;
+                this.frame = 0;
+                this.timerAnim = 0;
+                this.emDash = false;
+                this.cooldownDano = 0;
+                this.timerMorte = 0;
+                this.timerRastro = 0;
+                this.rastros = [];
+            }
+
+            atualizar(cat) {
+                if (this.morto) return;
+
+                // --- LÓGICA DE MORTE ---
+                if (this.timerMorte > 0) {
+                    this.timerMorte--;
+                    if (this.timerMorte <= 0) this.morto = true; // Desaparece para sempre
+                    return; // Bloqueia movimento e colisão se estiver morrendo
+                }
+
+                // --- MOVIMENTO E IA ---
+                let dist = Math.abs(this.x - cat.worldX);
+                let olhando = (this.direcao === 1 && cat.worldX > this.x) || (this.direcao === -1 && cat.worldX < this.x);
+
+                if (dist < 180 && !this.emDash && olhando) {
+                    this.emDash = true;
+                    this.velX = (velMaxBoost * 0.8) * this.direcao;
+                } else if (dist > 250) {
+                    this.emDash = false;
+                    this.velX = this.velBase * this.direcao;
+                }
+
+                this.x += this.velX;
+
+                // Patrulha dentro dos limites informados
+                if (this.x < this.limiteEsq) { this.direcao = 1; this.velX = Math.abs(this.velX); }
+                if (this.x + this.w > this.limiteDir) { this.direcao = -1; this.velX = -Math.abs(this.velX); }
+
+                // --- COLISÃO EXATA DO BOSS ---
+                this.checarColisao(cat);
+
+                // --- ANIMAÇÃO E RASTRO ---
+                this.timerAnim++;
+                let framesEspera = this.emDash ? 6 : 12;
+                if (this.timerAnim > framesEspera) {
+                    this.frame = (this.frame + 1) % imgsMiniBear.length;
+                    this.timerAnim = 0;
+                }
+
+                if (this.emDash) {
+                    this.timerRastro++;
+                    if (this.timerRastro % 3 === 0) {
+                        this.rastros.unshift({ x: this.x, y: this.y, frame: this.frame, dir: this.direcao });
+                        if (this.rastros.length > 6) this.rastros.pop();
+                    }
+                } else if (this.rastros.length > 0) this.rastros.pop();
+
+                if (this.cooldownDano > 0) this.cooldownDano--;
+            }
+            
+
+            checarColisao(cat) {
+                const hbM = { x: this.x, y: this.y, w: this.w, h: this.h };
+                const hbR = { x: cat.worldX - 15, y: cat.y, w: 30, h: 95 };
+
+                if (verificarIntersecao(hbR, hbM)) {
+                    let pescat = cat.y + 95;
+                    let topoM = this.y + 20;
+
+                    // Lógica de Dano no Inimigo (Pisada)
+                    if (pescat < topoM + 30 && cat.velY > 0.5 && !cat.estaNoChao) {
+                        if (this.cooldownDano <= 0) {
+                            this.vida--;
+
+                            // ✅ SOM QUANDO MINIBEAR MENOR LEVA DANO
+                            sfxHitNoMinibear.currentTime = 0;
+                            sfxHitNoMinibear.play().catch(() => { });
+
+                            this.cooldownDano = 50;
+                            cat.velY = -12;
+                            intensidadeTremor = 5;
+                            setTimeout(() => intensidadeTremor = 0, 150);
+
+                            if (this.vida <= 0) this.timerMorte = 60;
+                        }
+                    }
+                    // Lógica de Dano no personagen (Toque lateral/parado)
+                    else if (!godMode && !controlesBloqueados && this.cooldownDano <= 0) {
+                        aplicarDano();
+                        let dirRepulso = (cat.worldX < this.x + this.w / 2) ? -1 : 1;
+                        controlesBloqueados = true;
+                        cat.boostAtivo = false;
+                        cat.velX = dirRepulso * 10;
+                        cat.velY = -6;
+                        setTimeout(() => { if (!gameOver) controlesBloqueados = false; }, 300);
+                    }
+                }
+            }
+            desenhar() {
+                if (this.morto) return;
+
+                // 1. DESENHAR RASTROS (FANTASMAS) - Apenas se estiver em Dash
+                if (this.emDash && this.timerMorte === 0) {
+                    this.rastros.forEach((r, i) => {
+                        let imgR = imgsMiniBear[r.frame];
+
+                        // Proteção contra imagens não carregadas (Anti-Tela Azul)
+                        if (imgR && imgR.complete && imgR.naturalWidth !== 0) {
+                            ctx.save();
+                            // Opacidade diminui conforme o rastro envelhece
+                            ctx.globalAlpha = (1 - i / this.rastros.length) * 0.3;
+                            // Efeito visual de "vulto"
+                            ctx.filter = "brightness(1.5) sepia(1) hue-rotate(-50deg) saturate(5)";
+                            ctx.translate(r.x, r.y);
+
+                            if (r.dir === -1) {
+                                ctx.scale(-1, 1);
+                                ctx.drawImage(imgR, -this.w, 0, this.w, this.h);
+                            } else {
+                                ctx.drawImage(imgR, 0, 0, this.w, this.h);
+                            }
+                            ctx.restore();
+                        }
+                    });
+                }
+
+                // 2. DESENHO DO CORPO PRINCIPAL DO MINIBEAR COMUM
+                let img = imgsMiniBear[this.frame];
+                if (img && img.complete && img.naturalWidth !== 0) {
+                    ctx.save();
+
+                    // Efeito de flash ao tomar dano ou morrer
+                    if (this.timerMorte > 0 || this.cooldownDano > 0) {
+                        ctx.filter = "brightness(5)";
+                    }
+
+                    ctx.translate(this.x, this.y);
+                    if (this.direcao === -1) {
+                        ctx.scale(-1, 1);
+                        ctx.drawImage(img, -this.w, 0, this.w, this.h);
+                    } else {
+                        ctx.drawImage(img, 0, 0, this.w, this.h);
+                    }
+                    ctx.restore();
+                }
+            }
+        
+        }
+
+               class InimigoNftWite {
+                    constructor(x, y, isSpawning = false) {
+                        this.x = x;
+                        this.y = y;
+                        this.w = 64;
+                        this.h = 80;
+                        this.velX = 2.2;
+                        this.direcao = 1;
+                        this.estado = isSpawning ? "spawn" : "patrulha";
+                        this.frame = isSpawning ? imgsNftDeath.length - 1 : 0;
+                        this.timerAnim = 0;
+                        this.morto = false;
+                        this.timerMorte = 0;
+                        this.cooldownAtaque = 0;
+                        this.timerIdleAfterSpawn = isSpawning ? 1200 : 0; // 1.2 segundos em idle após spawn
+                    }
+
+                    atualizar(cat, mapa) {
+                        if (this.morto) return;
+
+                        // === ANIMAÇÃO DE SPAWN (REVERSE DEATH) ===
+                        if (this.estado === "spawn") {
+                            this.timerAnim++;
+                            if (this.timerAnim > 9) {
+                                this.timerAnim = 0;
+                                this.frame--;
+
+                                if (this.frame < 0) {
+                                    this.estado = "idleAfterSpawn";   // vai para idle
+                                    this.frame = 0;
+                                    this.timerIdleAfterSpawn = Date.now(); // inicia contagem
+                                }
+                            }
+                            return;
+                        }
+
+                        // === IDLE APÓS SPAWN (novo estado) ===
+                        if (this.estado === "idleAfterSpawn") {
+                            // Fica parado olhando pro jogador
+                            let dist = Math.abs(this.x - cat.worldX);
+                            if (dist < 400) {
+                                this.direcao = (cat.worldX < this.x) ? -1 : 1;
+                            }
+
+                            // Após 1.2s ativa de verdade
+                            if (Date.now() - this.timerIdleAfterSpawn > 1200) {
+                                this.estado = "patrulha";
+                            }
+                            return; // não anda nem ataca ainda
+                        }
+
+                            // ... (o resto do código de atualizar continua igual - patrulha, ataque, morte)
+                            if (this.estado === "morte") {
+                                this.timerAnim++;
+                                if (this.timerAnim > 8) {
+                                    this.frame++;
+                                    this.timerAnim = 0;
+                                    if (this.frame >= imgsNftDeath.length) this.morto = true;
+                                }
+                                return;
+                            }
+
+                            // Movimento normal (mesmo código que você já tinha)
+                            let vaiCair = true;
+                            let vaiBater = false;
+                            const frenteX = this.x + (this.direcao * 45);
+                            const baixoY = this.y + this.h + 12;
+
+                            mapa.forEach(p => {
+                                if (p.tipo === "chao" || p.tipo === "plataforma" || p.tipo === "flutuante") {
+                                    if (frenteX > p.x && frenteX < p.x + p.w && baixoY > p.y && baixoY < p.y + p.h + 50) {
+                                        vaiCair = false;
+                                    }
+                                    if (verificarIntersecao({ x: this.x + (this.direcao * 10), y: this.y + 15, w: this.w, h: this.h - 40 }, p)) {
+                                        vaiBater = true;
+                                    }
+                                }
+                            });
+
+                            if (vaiCair || vaiBater) this.direcao *= -1;
+                            this.x += this.velX * this.direcao;
+
+                            // Detecção de ataque (mesmo de antes)
+                            const hbInimigo = { x: this.x, y: this.y, w: this.w, h: this.h };
+                            const hbCat = { x: cat.worldX - 15, y: cat.y, w: 30, h: 95 };
+
+                            if (verificarIntersecao(hbCat, hbInimigo)) {
+                                let pesCat = cat.y + 95;
+                                let topoInimigo = this.y + 20;
+
+                                if (pesCat < topoInimigo + 30 && cat.velY > 0 && !cat.estaNoChao) {
+                                    this.estado = "morte";
+                                    this.frame = 0;
+                                    sfxDanoNoNFT.currentTime = 0;
+                                    sfxDanoNoNFT.play().catch(() => { });
+                                    cat.velY = -11;
+                                }
+                                else if (this.estado !== "ataque" && this.cooldownAtaque <= 0) {
+                                    this.estado = "ataque";
+                                    this.frame = 0;
+                                    this.timerAnim = 0;
+                                    this.cooldownAtaque = 45;
+                                    aplicarDano();
+                                }
+                            }
+
+                            // Animação normal
+                            if (this.estado === "ataque") {
+                                this.timerAnim++;
+                                if (this.timerAnim > 6) {
+                                    this.frame++;
+                                    this.timerAnim = 0;
+                                    if (this.frame >= imgsNftAtk.length) {
+                                        this.estado = "patrulha";
+                                        this.frame = 0;
+                                    }
+                                }
+                            } else {
+                                this.timerAnim++;
+                                if (this.timerAnim > 9) {
+                                    this.timerAnim = 0;
+                                    this.frame = (this.frame + 1) % imgsNftWalk.length;
+                                }
+                            }
+
+                            if (this.cooldownAtaque > 0) this.cooldownAtaque--;
+                        }
+
+                        desenhar() {
+                            if (this.morto) return;
+
+                            let imgLista;
+                            if (this.estado === "spawn" || this.estado === "morte") imgLista = imgsNftDeath;
+                            else if (this.estado === "ataque") imgLista = imgsNftAtk;
+                            else imgLista = imgsNftWalk;
+
+                            let img = imgLista[this.frame % imgLista.length];
+
+                            if (img && img.complete) {
+                                ctx.save();
+                                ctx.translate(this.x + this.w / 2, this.y);
+                                if (this.direcao === -1) ctx.scale(-1, 1);
+                                ctx.drawImage(img, -this.w / 2, 0, this.w, this.h);
+                                ctx.restore();
+                            }
+                        }
+                    }
+        
+                class InimigoIdleNftWite {
+                        constructor(x, y) {
+                            this.x = x;
+                            this.y = y;
+                            this.w = 64;
+                            this.h = 80;
+                            this.direcao = 1;
+                            this.estado = "idle";
+                            this.frame = 0;
+                            this.timerAnim = 0;
+                            this.morto = false;
+                            this.timerMorte = 0;
+                            this.velX = 0; // começa parado
+                        }
+
+                        atualizar(cat, mapa) {
+                            if (this.morto || this.estado === "morte") {
+                                this.timerAnim++;
+                                if (this.timerAnim > 8) {
+                                    this.frame++;
+                                    this.timerAnim = 0;
+                                    if (this.frame >= imgsNftDeath.length) this.morto = true;
+                                }
+                                return;
+                            }
+
+                            // === DETECÇÃO DE PLATAFORMA (IMPORTANTE) ===
+                            let temChao = false;
+                            const baixoY = this.y + this.h + 8; // checa um pouco abaixo
+
+                            mapa.forEach(p => {
+                                if (p.tipo === "chao" || p.tipo === "plataforma" || p.tipo === "flutuante") {
+                                    if (this.x + this.w / 2 > p.x &&
+                                        this.x + this.w / 2 < p.x + p.w &&
+                                        baixoY > p.y && baixoY < p.y + p.h + 40) {
+                                        temChao = true;
+                                    }
+                                }
+                            });
+
+                            // Se não tiver chão, cai
+                            if (!temChao) {
+                                this.y += 4; // gravidade simples
+                            }
+
+                            // Olha para o jogador se estiver perto
+                            let dist = Math.abs(this.x - cat.worldX);
+                            if (dist < 320) {
+                                this.direcao = (cat.worldX < this.x) ? -1 : 1;
+                            }
+
+                            // Animação
+                            this.timerAnim++;
+                            let framesPorCiclo = (this.estado === "ataque") ? 6 : 12;
+                            if (this.timerAnim > framesPorCiclo) {
+                                this.timerAnim = 0;
+                                if (this.estado === "idle") {
+                                    this.frame = (this.frame + 1) % imgsIdleNft.length;
+                                } else if (this.estado === "ataque") {
+                                    this.frame++;
+                                    if (this.frame >= imgsIdleNftAtk.length) {
+                                        this.estado = "idle";
+                                        this.frame = 0;
+                                    }
+                                }
+                            }
+
+                            this.checarColisaocat(cat);
+                        }
+
+                        checarColisaocat(cat) {
+                            const hbInimigo = { x: this.x, y: this.y, w: this.w, h: this.h };
+                            const hbcat = { x: cat.worldX - 15, y: cat.y, w: 30, h: 95 };
+
+                            if (verificarIntersecao(hbcat, hbInimigo)) {
+                                let pesCat = cat.y + 95;
+                                let topoInimigo = this.y + 20;
+
+                                if (pesCat < topoInimigo + 30 && cat.velY > 0 && !cat.estaNoChao) {
+                                    // Pisada = morte
+                                    this.estado = "morte";
+                                    this.frame = 0;
+                                    sfxDanoNoNFT.currentTime = 0;
+                                    sfxDanoNoNFT.play().catch(() => { });
+                                    cat.velY = -11;
+                                }
+                                else if (this.estado === "idle") {
+                                    this.estado = "ataque";
+                                    this.frame = 0;
+                                    aplicarDano();
+                                }
+                            }
+                        }
+
+                        desenhar() {
+                            if (this.morto) return;
+
+                            let imgLista = this.estado === "ataque" ? imgsIdleNftAtk : imgsIdleNft;
+                            if (this.estado === "morte") imgLista = imgsNftDeath;
+
+                            let img = imgLista[this.frame % imgLista.length];
+
+                            if (img && img.complete) {
+                                ctx.save();
+                                ctx.translate(this.x, this.y);
+                                if (this.direcao === -1) ctx.scale(-1, 1);
+                                ctx.drawImage(img, -this.w / 2, 0, this.w, this.h);
+                                ctx.restore();
+                            }
+                        }
+                    } 
+            
+        
+       function ativarTremor(forca, duracao = 400) {
+            intensidadeTremor = forca;
+
+            // 🔥 Só toca o som se for a ÚLTIMA onda
+            if (!tremorSomAtivo && forca > 0 && miniBear.ondaAtual >= miniBear.totalOndas) {
+                tremorSomAtivo = true;
+                sfxTremor.currentTime = 0;
+                sfxTremor.play().catch(() => { });
+
+                setTimeout(() => {
+                    tremorSomAtivo = false;
+                    if (intensidadeTremor <= 1.5) sfxTremor.pause();
+                }, duracao);
+            }
+        } 
+
+        // lista para os novos inimigos
+        let inimigosComuns = [];
+        // Exemplo: Colocando inimigos em diferentes setores
+           // inimigosComuns.push(new InimigoMinibear(7300, 460, 7000, 7600)); // Setor 2
+
+        // Adicione os NFTWites em pontos estratégicos
+            inimigosComuns.push(new InimigoNftWite(4774, 600)); // Setor 2
+            inimigosComuns.push(new InimigoNftWite(12000, 600)); // Setor 3
+
+        // Exemplo: Vigia guardando uma plataforma no Setor 2
+            inimigosComuns.push(new InimigoIdleNftWite(6500, 500));
+             inimigosComuns.push(new InimigoIdleNftWite(19752, 370));
+            inimigosComuns.push(new InimigoIdleNftWite(20608, 500));
+             
+            // Exemplo: Vigia perto da escada de cubos no Setor 6
+            inimigosComuns.push(new InimigoIdleNftWite(25500, 360));   
+
+            // === REFERÊNCIA AO VIGIA PARA O EVENTO AMBUSH ===
+                const inimigoVigia = inimigosComuns[2]; // Índice 2 = o vigia em x=6500
+             
+
+        function desenharCapa() {
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+                if (imgCapa.complete) {
+                    ctx.drawImage(imgCapa, 0, 0, canvas.width, canvas.height);
+                } else {
+                    // Fundo caso a imagem não carregue
+                    ctx.fillStyle = "#0a0a1f";
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = "white";
+                    ctx.font = "bold 40px monospace";
+                    ctx.textAlign = "center";
+                    ctx.fillText("MANTLE ADVENTURE", canvas.width / 2, canvas.height / 2 - 50);
+                }
+
+                // === NOVA MENSAGEM NO MENU ===
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 28px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText("PRESS SPACE TO START", canvas.width / 2, canvas.height - 80);
+
+                ctx.restore();
+            }  
+            
+                function resetarParaMenu() {
+            gameState = "menu";
+            cutsceneFinalAtiva = false;
+            cutsceneFinalStep = 0;
+            fadePretoAlpha = 0;
+            finalFadeAlpha = 0;
+            videoFinalAtivo = false;
+            videoFinal.pause();
+            videoFinal.currentTime = 0;
+
+            emCutscene = false;
+            controlesBloqueados = false;
+            jaulaAtual = imgJaula1;
+
+            // Reset completo do jogador
+            cat.worldX = 332;
+            cat.y = 580;
+            cat.velX = 0;
+            cat.velY = 0;
+            cat.estado = "parado";
+            cat.boostAtivo = false;
+            cat.rastros = [];
+
+            // Reset de inputs (muito importante)
+            movendoDireita = false;
+            movendoEsquerda = false;
+            cat.boostAtivo = false;
+            cat.velX = 0;
+            cat.velY = 0;
+
+            // Reset sons
+            bgmLevel1.pause();
+            bgmLevel1.currentTime = 0;
+            sfxOpenDoor.pause();
+            sfxOpenDoor.currentTime = 0;
+            sfxPilarDrag.pause();
+            sfxPilarDrag.currentTime = 0;
+            sfxPilarDrag2.pause();
+            sfxPilarDrag2.currentTime = 0;
+
+            vida = 6;
+            scrollX = 0;
+            arenaConcluida = false;
+            cenaArenaOcorreu = false;
+            miniBear.morto = false;
+
+            console.log("Reset para menu completo - inputs zerados");
+        }
+            
+
+        function loop() {
+                if (gameOver) { exibirGameOver(); return; }
+
+            // === MENU (não interfere na cutscene) ===
+            if (gameState === "menu") {
+                desenharCapa();
+                requestAnimationFrame(loop);
+                return;
+            }
+                const agora = Date.now();
+
+                        // Bloqueio forte durante cutscene final (Step 0)
+            if (cutsceneFinalAtiva && cutsceneFinalStep === 0) {
+                cat.velY = 0;
+                cat.y = 580;                    // altura do chão/plataforma
+                cat.estaNoChao = true;
+                cat.estado = "correndo";
+
+                // === FORÇA ANIMAÇÃO DE CORRIDA DURANTE CUTSCENE ===
+                cat.contadorDeTempo++;
+                if (cat.contadorDeTempo >= cat.atrasoAnimacao) {
+                    cat.contadorDeTempo = 0;
+                    cat.frameAtual = (cat.frameAtual + 1) % imgsRun.length;
+                }
+            }
+
+                // --- SENTINELA DO MENU ---
+                if (gameState === "menu") {
+                    desenharCapa(); // Desenha a capa
+                    requestAnimationFrame(loop); // Mantém o loop esperando
+                    return; // PARA AQUI. O computador ignora todo o resto (física/inimigos)
+                }
+            const invencivel = agora < tempoDano + duracaoInvulnerabilidade;
+
+                        let vMax = cat.boostAtivo ? velMaxBoost : velMaxBase;
+
+            // Equilíbrio: bom alcance + controle preciso no pulo normal
+            const airControl = cat.estaNoChao ? 1 : 0.75;   // 0.75 = bom meio termo
+
+            if (movendoDireita) cat.velX = Math.min(cat.velX + aceleracao * airControl, vMax);
+            else if (movendoEsquerda) cat.velX = Math.max(cat.velX - aceleracao * airControl, -vMax);
+            else {
+                const fric = cat.estaNoChao ? friccao : friccao * 0.45; // fricção moderada no ar
+                if (cat.velX > 0) cat.velX = Math.max(0, cat.velX - fric);
+                else if (cat.velX < 0) cat.velX = Math.min(0, cat.velX + fric);
+            }
+                        console.log("VelX:", cat.velX.toFixed(2), "NoChao:", cat.estaNoChao, "VelY:", cat.velY.toFixed(2));
+            cat.velY += (cat.velY < 0) ? cat.gravidadeSubida : cat.gravidadeQueda;
+
+            const hbLargura = 30; const hbAltura = 95;
+            cat.worldX += cat.velX;
+            if (cat.worldX < scrollX + 25) { cat.worldX = scrollX + 25; cat.velX = 0; }
+
+            mapa.forEach(p => {
+                if (p.tipo === "obstaculo") {
+                    const hbR = { x: cat.worldX - hbLargura / 2, y: cat.y + 5, w: hbLargura, h: hbAltura - 10 };
+                    if (verificarIntersecao(hbR, p)) {
+                        if (cat.velX > 0) cat.worldX = p.x - hbLargura / 2;
+                        else if (cat.velX < 0) cat.worldX = p.x + p.w + hbLargura / 2;
+                        cat.velX = 0;
+                    }
+                }
+            });
+
+            
+
+            // --- LÓGICA DO BOSS: MINIBEAR CIBORG (CORRIGIDA E ESTÁVEL) ---
+            // --- LÓGICA DO BOSS: MINIBEAR CIBORG (CORRIGIDA E ESTÁVEL) ---
+            if (cenaArenaOcorreu && !miniBear.morto) {
+
+                // 1. MORTE (sempre executa a animação, mesmo morrendo)
+                if (miniBear.timerMorte > 0) {
+                    miniBear.timerMorte--;
+
+                    // Tremor leve durante a morte
+                    ativarTremor(5, 150);
+
+                    // Animação continua rodando durante a morte
+                    miniBear.timerAnim++;
+                    if (miniBear.timerAnim > 5) {
+                        miniBear.frame = (miniBear.frame + 1) % imgsMiniBear.length;
+                        miniBear.timerAnim = 0;
+                    }
+
+                    if (miniBear.timerMorte <= 0) {
+                        if (miniBear.ondaAtual < miniBear.totalOndas) {
+                            renascerMinibear();
+                            ativarTremor(12, 600);
+                        } else {
+                            miniBear.morto = true;
+                            miniBear.timerMorte = 0;
+                            arenaConcluida = true;
+                            ativarTremor(0, 0);
+                        }
+                    }
+                }
+
+                // 2. TREMOR CONSTANTE NA ÚLTIMA ONDA (só enquanto vivo)
+                else if (miniBear.ondaAtual >= miniBear.totalOndas) {
+                    ativarTremor(6, 250);
+                }
+
+                // 3. COMPORTAMENTO NORMAL (movimento, dash, IA, colisão) - só quando NÃO estiver morrendo
+                if (miniBear.timerMorte === 0) {
+                    let distanciaParacat = Math.abs(miniBear.x - cat.worldX);
+
+                    let olhandoParacat = (miniBear.direcao === 1 && cat.worldX > miniBear.x + miniBear.w / 2) ||
+                        (miniBear.direcao === -1 && cat.worldX < miniBear.x + miniBear.w / 2);
+
+                    if (distanciaParacat < 180 && !miniBear.emDash && olhandoParacat) {
+                        miniBear.emDash = true;
+                        miniBear.velX = (velMaxBoost * 1.5) * miniBear.direcao;
+                    } else if (distanciaParacat > 250) {
+                        miniBear.emDash = false;
+                        miniBear.velX = (velMaxBase * 0.55) * miniBear.direcao;
+                    }
+
+                    miniBear.x += miniBear.velX;
+
+                    if (miniBear.x < limiteEsquerdoArena) { miniBear.direcao = 1; miniBear.velX = Math.abs(miniBear.velX); }
+                    if (miniBear.x + miniBear.w > limiteDireitoArena) { miniBear.direcao = -1; miniBear.velX = -Math.abs(miniBear.velX); }
+
+                    // Colisão
+                    const hbBoss = { x: miniBear.x, y: miniBear.y, w: miniBear.w, h: miniBear.h };
+                    const hbcat = { x: cat.worldX - 15, y: cat.y, w: 30, h: 95 };
+
+                    if (verificarIntersecao(hbcat, hbBoss)) {
+                        let pesDocat = cat.y + 95;
+                        let topoBoss = miniBear.y + 20;
+
+                        if (pesDocat < topoBoss + 30 && cat.velY > 0.5 && !cat.estaNoChao) {
+                            if (miniBear.cooldownDano <= 0) {
+                                miniBear.vida--;
+                                sfxHitNoMinibear.currentTime = 0;
+                                sfxHitNoMinibear.play().catch(() => { });
+                                miniBear.cooldownDano = 50;
+                                cat.velY = -12;
+                                ativarTremor(10, 300);
+                                if (miniBear.vida <= 0) miniBear.timerMorte = 60;
+                            }
+                        } else if (!godMode && !controlesBloqueados && miniBear.cooldownDano <= 0) {
+                            aplicarDano("minibear");
+                            let direcaoRepulso = (cat.worldX < miniBear.x + miniBear.w / 2) ? -1 : 1;
+                            controlesBloqueados = true;
+                            cat.boostAtivo = false;
+                            cat.velX = direcaoRepulso * 10;
+                            cat.velY = -6;
+                            cat.worldX += direcaoRepulso * 10;
+                            setTimeout(() => { if (!gameOver) controlesBloqueados = false; }, 300);
+                        }
+                    }
+
+                    // Animação normal
+                    miniBear.timerAnim++;
+                    if (miniBear.timerAnim > (miniBear.emDash ? 3 : 6)) {
+                        miniBear.frame = (miniBear.frame + 1) % imgsMiniBear.length;
+                        miniBear.timerAnim = 0;
+                    }
+
+                    // Rastro
+                    if (miniBear.emDash) {
+                        miniBear.timerRastro++;
+                        if (miniBear.timerRastro % 3 === 0) {
+                            miniBear.rastros.unshift({ x: miniBear.x, y: miniBear.y, frame: miniBear.frame, dir: miniBear.direcao });
+                            if (miniBear.rastros.length > 8) miniBear.rastros.pop();
+                        }
+                    } else {
+                        miniBear.timerRastro = 0;
+                        if (miniBear.rastros.length > 0) miniBear.rastros.pop();
+                    }
+                }
+
+                if (miniBear.cooldownDano > 0) miniBear.cooldownDano--;
+            }
+
+                        // === PILAR DE ESPINHOS DESCENDO (ativado pelo cubo) ===
+            if (pilarEspinhosAtivado) {
+                const pilar = mapa.find(p => p.x === 4955 && p.sprite === imgPilarTriploEspinhos);
+                if (pilar && pilar.y < 800) {
+                    pilar.y += 1.1;
+
+                    // Toca o novo som específico
+                    if (!sfxPilarDrag2.playing) {
+                        sfxPilarDrag2.currentTime = 0;
+                        sfxPilarDrag2.play().catch(() => { });
+                        sfxPilarDrag2.playing = true;
+                    }
+                } else if (pilar && pilar.y >= 800) {
+                    sfxPilarDrag2.pause();
+                    sfxPilarDrag2.currentTime = 0;
+                    sfxPilarDrag2.playing = false;
+                }
+            }
+
+            // Adicione em qualquer lugar dentro do loop principal
+            inimigosComuns.forEach(inimigo => inimigo.atualizar(cat, mapa));
+
+                        // === EVENTO AMBUSH - VIGIA EM 6500 ===
+            if (!eventoAmbushAtivado && inimigoVigia &&
+                (inimigoVigia.morto || cat.worldX > inimigoVigia.x + 80)) {
+
+                eventoAmbushAtivado = true;
+                ambushStep = 1;
+                timerAmbush = Date.now();
+                controlesBloqueados = true;
+                emCutscene = true;
+
+                // Parada imediata
+                cat.velX = 0;
+                cat.velY = 0;
+                cat.boostAtivo = false;
+                movendoDireita = false;
+                movendoEsquerda = false;
+
+                // Spawn imediato dos NFTs
+                const spawnY = 518;
+                const novosInimigos = [
+                    new InimigoNftWite(cat.worldX - 240, spawnY, true),
+                    new InimigoNftWite(cat.worldX - 290, spawnY, true),
+                    new InimigoNftWite(cat.worldX - 340, spawnY, true),
+                    new InimigoNftWite(cat.worldX - 420, spawnY, true),
+                    new InimigoNftWite(cat.worldX - 500, spawnY, true),
+                    new InimigoNftWite(cat.worldX - 580, spawnY, true),
+                    new InimigoNftWite(cat.worldX + 260, spawnY, true),
+                    new InimigoNftWite(cat.worldX + 420, spawnY, true),
+                    new InimigoNftWite(cat.worldX + 460, spawnY, true), 
+                    new InimigoNftWite(cat.worldX + 520, spawnY, true), 
+                ];
+
+                inimigosComuns.push(...novosInimigos);
+
+                sfxNftRespawn.currentTime = 0;
+                sfxNftRespawn.play().catch(() => { });
+
+                console.log("🚨 AMBUSH ATIVADO! NFTs se materializando...");
+            }
+
+            if (eventoAmbushAtivado && ambushStep === 1) {
+                let agora = Date.now();
+                let tempoDecorrido = agora - timerAmbush;
+
+                // Durante os primeiros 0.7s → Gato travado + força no chão
+                if (tempoDecorrido < 700) {
+                    cat.velX = 0;
+                    cat.velY = 0;
+                    cat.boostAtivo = false;
+
+                    // Força cair no chão
+                    let encontrouChao = false;
+                    const gatoBase = cat.y + cat.altura;
+                    mapa.forEach(p => {
+                        if ((p.tipo === "chao" || p.tipo === "plataforma" || p.tipo === "flutuante") &&
+                            cat.worldX + 30 > p.x && cat.worldX - 30 < p.x + p.w) {
+                            if (gatoBase > p.y - 40 && gatoBase < p.y + 80) {
+                                cat.y = p.y - cat.altura;
+                                encontrouChao = true;
+                            }
+                        }
+                    });
+                    if (encontrouChao) {
+                        cat.estaNoChao = true;
+                        cat.estado = "parado";
+                        cat.frameAtual = 0;
+                    }
+                }
+                // 0.7s ~ 1.2s → Libera o gato + INVENCIBILIDADE DE 1 SEGUNDO
+                else if (tempoDecorrido < 1200) {
+                    controlesBloqueados = false;
+                    emCutscene = false;
+
+                    // Ativa invencibilidade por 1 segundo a partir de agora
+                    tempoDano = Date.now() - (duracaoInvulnerabilidade - 1500);
+                }
+                // Após 1.2s → Ativa os NFTs
+                else if (ambushStep === 1) {
+                    ambushStep = 2;
+
+                    inimigosComuns.forEach(inimigo => {
+                        if (inimigo.estado === "idleAfterSpawn") {
+                            inimigo.estado = "patrulha";
+                        }
+                    });
+
+                    console.log("⚔️ NFTs ativados! Corra!");
+                }
+            }
+                        cat.y += cat.velY;
+            let colidiuChao = false;
+
+            mapa.forEach(p => {
+                const hbR = { x: cat.worldX - hbLargura / 2, y: cat.y, w: hbLargura, h: hbAltura };
+                if (verificarIntersecao(hbR, p)) {
+
+                        // === COLISÃO CUBO (HITBOX MÁXIMA DO GATO) ===
+                    mapa.forEach(p => {
+                        if (p.objeto && typeof p.objeto.atualizar === "function" && p.objeto.estado === "normal") {
+                            const hbCat = { x: cat.worldX - 28, y: cat.y - 5, w: 56, h: 70 };
+                            const hbCuboBaixo = { x: p.x + 6, y: p.y + p.h - 22, w: p.w - 12, h: 22 };
+
+                            if (verificarIntersecao(hbCat, hbCuboBaixo)) {
+                                p.objeto.estado = "hit";
+                                cat.velY = 5;
+                                console.log("✅ Cubo ativado!");
+                            }
+                        }
+                    });
+                    // Colisão normal com plataformas/chão
+                    if (p.tipo === "flutuante" || p.tipo === "plataforma") {
+                        if (cat.velY > 0 && (cat.y + hbAltura - cat.velY) <= p.y + 10) {
+                            cat.y = p.y - hbAltura; cat.velY = 0; colidiuChao = true;
+                        }
+                    } else {
+                        if (cat.velY > 0 && cat.y + hbAltura <= p.y + 20) {
+                            cat.y = p.y - hbAltura; cat.velY = 0; colidiuChao = true;
+                            if (p.tipo !== "dano") ultimoCheckpoint = { x: cat.worldX, y: cat.y };
+                        } else if (cat.velY < 0 && cat.y >= p.y + p.h - 20) {
+                            cat.y = p.y + p.h; cat.velY = 0;
+                        }
+                        if (p.tipo === "dano" && !invencivel) aplicarDano();
+                    }
+                }
+            });
+
+        
+
+            entidadesPerigo.forEach(ent => {
+                ent.timer++;
+                if (ent.timer >= 6) { ent.frame = (ent.frame + 1) % 4; ent.timer = 0; }
+                const hbDano = { x: ent.x, y: ent.y, w: ent.w * 1.5, h: ent.h * 1.5 };
+                const hbcat = { x: cat.worldX - 15, y: cat.y, w: 30, h: 95 };
+                if (!invencivel && verificarIntersecao(hbcat, hbDano)) {
+                    aplicarDano("eletrico");           // ← agora passa o tipo
+                    controlesBloqueados = true;
+                    cat.boostAtivo = false;
+                    const dir = cat.worldX < ent.x ? -1 : 1;
+                    cat.velX = dir * 7;
+                    cat.velY = -6;
+                    setTimeout(() => { if (!gameOver) controlesBloqueados = false; }, 300);
+                }
+            });
+
+            cat.estaNoChao = colidiuChao;
+            // Decaimento natural do tremor (mais suave e duradouro)
+            if (intensidadeTremor > 0) {
+                intensidadeTremor = Math.max(0, intensidadeTremor * 0.94);
+            }
+            if (cat.estaNoChao) cat.tempoNoAr = 0; else cat.tempoNoAr++;
+
+                        // --- LÓGICA DE CÂMERA COM TRAVA DE ARENA ---
+            if (!emCutscene && !cutsceneFinalAtiva) {   // ← bloqueia câmera na cutscene final
+                let alvoScroll = cat.worldX - pontoMortoX;
+
+                // A trava só funciona se a cena ocorreu E a arena ainda NÃO acabou
+                if (cenaArenaOcorreu && !arenaConcluida) {
+                    let maxScrollPossivel = limiteDireitoArena - canvas.width;
+                    let minScrollPossivel = limiteEsquerdoArena;
+                    alvoScroll = Math.max(minScrollPossivel, Math.min(alvoScroll, maxScrollPossivel));
+                }
+
+                if (alvoScroll < 0) alvoScroll = 0;
+                scrollX += (alvoScroll - scrollX) * suavidadeCamera;
+            }
+
+            // Isso deve vir sempre depois do cálculo do scrollX
+            cat.currentX = cat.worldX - scrollX;
+
+            if (cat.y > canvas.height) {
+                aplicarDano();
+                if (!gameOver) {
+                    aguardandoResetInput = true;
+                    movendoDireita = false; movendoEsquerda = false;
+                    cat.worldX = ultimoCheckpoint.x; cat.y = ultimoCheckpoint.y;
+                    cat.velX = 0; cat.velY = 0; cat.boostAtivo = false;
+                    let alvoR = cat.worldX - pontoMortoX; scrollX = alvoR < 0 ? 0 : alvoR;
+                }
+            }
+
+                // Só cria rastro se estiver com boost ATIVO E se movendo
+                        // === CRIAÇÃO E ATUALIZAÇÃO DO RASTRO (MAIS LONGO + RETRÁTIL) ===
+            if (cat.boostAtivo && Math.abs(cat.velX) > 1.2) {
+                cat.rastros.unshift({
+                    x: cat.currentX,
+                    y: cat.y,
+                    frame: cat.frameAtual,
+                    dir: cat.direcao,
+                    estado: cat.estado,
+                    vY: cat.velY,
+                    retract: 0
+                });
+                if (cat.rastros.length > 13) cat.rastros.pop();   // mantido em 17
+            }
+            else {
+                // === RETRAÇÃO MAIS LENTA (rastro fica mais tempo visível) ===
+                for (let i = 0; i < cat.rastros.length; i++) {
+                    const r = cat.rastros[i];
+                    r.retract = (r.retract || 0) + 0.25;   // ← mais lento = rastro mais longo
+
+                    const targetX = cat.currentX;
+                    const targetY = cat.y;
+
+                    r.x = r.x * (1 - r.retract) + targetX * r.retract;
+                    r.y = r.y * (1 - r.retract) + targetY * r.retract;
+
+                    // Proteção anti-ultrapassagem
+                    if (cat.direcao === 1 && r.x > targetX + 5) r.x = targetX + 5;
+                    if (cat.direcao === -1 && r.x < targetX - 5) r.x = targetX - 5;
+                }
+
+                // Remove bem mais devagar (fica mais longo)
+                if (cat.rastros.length > 0 && cat.rastros[cat.rastros.length - 1].retract > 0.94) {
+                    cat.rastros.pop();
+                }
+            }
+
+            if (cat.estaNoChao) {
+                if (Math.abs(cat.velX) > 0.5) {
+                    cat.estado = "correndo";
+                    if (++cat.contadorDeTempo >= cat.atrasoAnimacao) { cat.contadorDeTempo = 0; cat.frameAtual = (cat.frameAtual + 1) % imgsRun.length; }
+                } else { cat.estado = "parado"; cat.frameAtual = 0; }
+            } else { cat.estado = "pulando"; }
+
+            // --- SISTEMA DE CUTSCENE COM TREMOR ---
+                        if (cat.worldX > 28000 && !cenaArenaOcorreu) {
+                // Reset de inputs antes de iniciar a cutscene do pilar
+                movendoDireita = false;
+                movendoEsquerda = false;
+                cat.boostAtivo = false;
+                cat.velX = 0;
+                cat.velY = 0;
+
+                emCutscene = true;
+                const pilarEntrada = mapa.find(p => p.x === 27685);
+
+                if (pilarEntrada && pilarEntrada.y > 190) {
+                    pilarEntrada.y -= 2;
+                    ativarTremor(4, 800);
+
+                    // ✅ TOCA SOM DO PILAR SUBINDO (com loop)
+                    if (sfxPilarDrag.paused) {
+                        sfxPilarDrag.currentTime = 0;
+                        sfxPilarDrag.play().catch(() => { });
+                    }
+
+                    // Câmera foca no pilar
+                    let alvoCameraCena = pilarEntrada.x - 400;
+                    scrollX += (alvoCameraCena - scrollX) * 0.05;
+                }
+                else if (pilarEntrada && pilarEntrada.y <= 190) {
+                    pilarEntrada.y = 190;
+
+                    sfxPilarDrag.pause();
+                    sfxPilarDrag.currentTime = 0;
+
+                    // Troca de música: para a normal e inicia a da arena
+                    bgmLevel1.pause();
+                    bgmLevel1.currentTime = 0;
+
+                    bgmArena.currentTime = 0;
+                    bgmArena.play().catch(() => { });
+
+                    ativarTremor(0, 0);
+                    emCutscene = false;
+                    cenaArenaOcorreu = true;
+                }
+            }
+
+                        // === INÍCIO DA CUTSCENE FINAL (JAULA) ===
+                        if (miniBear.morto && miniBear.ondaAtual >= 3 && !cutsceneFinalAtiva) {
+                bgmArena.pause();
+                bgmArena.currentTime = 0;
+
+                // Reset de inputs ANTES de iniciar a cutscene
+                movendoDireita = false;
+                movendoEsquerda = false;
+                cat.boostAtivo = false;
+                cat.velX = 0;
+                cat.velY = 0;
+
+                cutsceneFinalAtiva = true;
+                cutsceneFinalStep = 0;
+                timerFinal = Date.now();
+                controlesBloqueados = true;
+                emCutscene = true;
+                ativarTremor(0, 0);
+
+                cutsceneInicialAtiva = false;
+
+                console.log("Cutscene final iniciada - inputs resetados");
+            }
+
+                        if (cutsceneFinalAtiva) {
+                let agoraCS = Date.now();
+
+                            // STEP 0: Espera 0.8 segundos após a morte do minibear (gato parado olhando para jaula)
+                if (cutsceneFinalStep === 0) {
+                    const centroX = 28293;
+
+                    if (agoraCS - timerFinal > 800) {
+                        timerFinal = agoraCS;
+                        cutsceneFinalStep = 1;
+                    }
+
+                    // Força sprite parado + direção correta para a jaula
+                    cat.estado = "parado";
+                    cat.frameAtual = 0;
+                    cat.velX = 0;
+                    cat.velY = 0;
+                    cat.y = 580;
+                    cat.estaNoChao = true;
+                    
+                    // Olha para o centro da jaula
+                    cat.direcao = (cat.worldX < centroX) ? 1 : -1;
+                }
+
+                // STEP 1: Gato anda até o centro da plataforma (velocidade 30% menor)
+                if (cutsceneFinalStep === 1) {
+                    const centroX = 28200;
+                    const distancia = centroX - cat.worldX;
+
+                    cutsceneForcandoPosicao = true;
+
+                    if (Math.abs(distancia) > 8) {
+                        cat.velX = distancia > 0 ? 2.66 : -2.66;   // 3.8 * 0.7 = ~30% mais lento
+                        cat.direcao = distancia > 0 ? 1 : -1;
+                        cat.velY = 0;
+                        cat.y = 580;
+                        cat.estaNoChao = true;
+                        cat.estado = "correndo";
+
+                        // Animação de corrida forçada
+                        cat.contadorDeTempo++;
+                        if (cat.contadorDeTempo >= cat.atrasoAnimacao) {
+                            cat.contadorDeTempo = 0;
+                            cat.frameAtual = (cat.frameAtual + 1) % imgsRun.length;
+                        }
+                    } else {
+                        // Chegou → pula
+                        cat.velX = 0;
+                        cat.direcao = (cat.worldX < centroX) ? 1 : -1;
+                        cat.velY = -17;
+                        cat.estaNoChao = false;
+                        cat.estado = "pulando";
+                        timerFinal = agoraCS;
+                        cutsceneFinalStep = 2;
+                        cutsceneForcandoPosicao = false;
+                    }
+                }
+
+                // STEP 2: Espera o gato pousar na plataforma
+                if (cutsceneFinalStep === 2) {
+                    if (cat.estaNoChao && agoraCS - timerFinal > 600) {
+                        timerFinal = agoraCS;
+                        cutsceneFinalStep = 3;
+                    }
+                }
+
+                // STEP 3: Jaula abre (0.5 segundos após pousar)
+                if (cutsceneFinalStep === 3) {
+                    if (agoraCS - timerFinal > 500) {
+                        jaulaAtual = imgJaula2;
+                        sfxOpenDoor.currentTime = 0;
+                        sfxOpenDoor.play().catch(() => { });
+
+                        timerFinal = agoraCS;
+                        cutsceneFinalStep = 4;
+                    }
+                }
+
+                // STEP 4: Fade para o vídeo
+                if (cutsceneFinalStep === 4) {
+                    if (agoraCS - timerFinal > 1200) {
+                        fadePretoAlpha = Math.min(1, fadePretoAlpha + 0.012);
+                        if (fadePretoAlpha >= 0.95) {
+                            fadePretoAlpha = 1;
+                            timerFinal = agoraCS;
+                            cutsceneFinalStep = 4.5;
+                        }
+                    }
+                }
+
+                if (cutsceneFinalStep === 4.5) {
+                    videoFinal.currentTime = 0;
+                    videoFinal.play().catch(() => { });
+                    videoFinalAtivo = true;
+                    cutsceneFinalStep = 5;
+                }
+
+                if (cutsceneFinalStep === 5) {
+                    if (videoFinal.ended || videoFinal.paused) {
+                        if (agoraCS - timerFinal > 4000) {
+                            resetarParaMenu();
+                        }
+                    }
+                }
+            }
+
+
+                        // === GATILHO CUTSCENE INICIAL (VERSÃO FORTE) ===
+            if (!cutsceneInicialAtiva &&
+                !cutsceneInicialJaRodou &&
+                !exibindoMenuTeleporte &&
+                cat.worldX > 1480 &&
+                gameState === "jogando" &&
+                !controlesBloqueados) {   // ← proteção extra
+
+                cutsceneInicialAtiva = true;
+                emCutscene = true;
+                timerCutsceneInicial = Date.now();
+                cutsceneInicialStep = 0;
+                popupAlpha = 0;
+                textoAtual = "";
+                controlesBloqueados = true;
+                movendoDireita = false;
+                movendoEsquerda = false;
+                cat.velX = 0;
+                cutsceneInicialJaRodou = true;
+                console.log("✅ Cutscene Inicial - Iniciada");
+            }
+
+            if (cutsceneInicialAtiva) {
+                let agora = Date.now();
+
+                if (cutsceneInicialStep === 0) {
+                    popupAlpha = Math.min(1, popupAlpha + 0.08);
+                    if (popupAlpha >= 1 && agora - timerCutsceneInicial > 800) {
+                        cutsceneInicialStep = 1;
+                        timerCutsceneInicial = agora;
+                    }
+                }
+
+                // DIGITAÇÃO + SOM
+                if (cutsceneInicialStep === 1) {
+                    let tempo = agora - timerCutsceneInicial;
+                    let textoCompleto = "HELP ME !";
+                    let chars = Math.floor(tempo / 55);
+                    let novoTexto = textoCompleto.substring(0, Math.min(chars, textoCompleto.length));
+
+                    if (novoTexto.length > textoAtual.length) {
+                        sfxTexto.currentTime = 0;
+                        sfxTexto.play().catch(() => { });
+                    }
+                    textoAtual = novoTexto;
+
+                    if (tempo > 1000) sfxTexto.pause();
+                    if (tempo > 2000) { cutsceneInicialStep = 2; timerCutsceneInicial = agora; }
+                }
+
+                if (cutsceneInicialStep === 2) {
+                    let tempo = agora - timerCutsceneInicial;
+                    let textoCompleto = "HA HA HA !";
+                    let chars = Math.floor(tempo / 55);
+                    let novoTexto = textoCompleto.substring(0, Math.min(chars, textoCompleto.length));
+
+                    if (novoTexto.length > textoAtual.length) {
+                        sfxTexto.currentTime = 0;
+                        sfxTexto.play().catch(() => { });
+                    }
+                    textoAtual = novoTexto;
+
+                    if (tempo >  1000) sfxTexto.pause();
+                    if (tempo > 2800) { cutsceneInicialStep = 3; timerCutsceneInicial = agora; }
+                }
+
+                if (cutsceneInicialStep === 3) {
+                    let tempo = agora - timerCutsceneInicial;
+                    let textoCompleto = "I WILL SAVE YOU!";
+                    let chars = Math.floor(tempo / 55);
+                    let novoTexto = textoCompleto.substring(0, Math.min(chars, textoCompleto.length));
+
+                    if (novoTexto.length > textoAtual.length) {
+                        sfxTexto.currentTime = 0;
+                        sfxTexto.play().catch(() => { });
+                    }
+                    textoAtual = novoTexto;
+
+                    if (tempo > 1000 ) sfxTexto.pause();
+                    if (tempo > 2800) { cutsceneInicialStep = 4; timerCutsceneInicial = agora; }
+                }
+
+                if (cutsceneInicialStep === 4) {
+                    popupAlpha = Math.max(0, popupAlpha - 0.08);
+                    if (popupAlpha <= 0.05) {
+                        cutsceneInicialStep = 5;
+                        timerCutsceneInicial = agora;
+                    }
+                }
+
+                                if (cutsceneInicialStep === 5) {
+                    bearMotoWorldX += 5.5;
+                    if (bearMotoWorldX > 2300) {
+                        cutsceneInicialAtiva = false;
+                        emCutscene = false;
+                        controlesBloqueados = false;
+
+                        // === RESET TOTAL DOS INPUTS ===
+                        movendoDireita = false;
+                        movendoEsquerda = false;
+                        cat.boostAtivo = false;
+                        cat.velX = 0;
+                        cat.velY = 0;
+
+                        console.log("Cutscene inicial finalizada - inputs resetados");
+                    }
+                }
+                            // === PULAR CUTSCENE INICIAL COM MOUSE ===
+                if (cutsceneInicialAtiva && !cutsceneFinalAtiva) {
+                    // Clique esquerdo pula a cutscene
+                    if (mouseIsPressed && mouseButton === LEFT) {
+                        // Força o bear a sair imediatamente
+                        bearMotoWorldX = 2500;
+                        cutsceneInicialStep = 5;
+                        // Fecha popup imediatamente
+                        popupAlpha = 0;
+                        sfxTexto.pause();
+                    }
+                }
+            }
+            
+            desenharCena();
+
+            if (mostrarControles) {
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+                ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                if (imgControles.complete) {
+                    // --- AJUSTE AQUI O TAMANHO QUE VOCÊ QUER ---
+                    let larguraDesejada = 600; // Mude este número para aumentar/diminuir
+                    let alturaDesejada = 400;  // Mude este número para aumentar/diminuir
+
+                    // Cálculo automático para centralizar na tela
+                    let posX = (canvas.width / 2) - (larguraDesejada / 2);
+                    let posY = (canvas.height / 2) - (alturaDesejada / 2);
+
+                    ctx.drawImage(imgControles, posX, posY, larguraDesejada, alturaDesejada);
+                }
+                ctx.restore();
+            }
+
+            requestAnimationFrame(loop);
+
+            
+        }
+
+        function desenharCena() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // CAMADA 0: Início do Tremor (Afeta tudo)
+            ctx.save();
+            if (intensidadeTremor > 0) {
+                ctx.translate((Math.random() - 0.5) * intensidadeTremor, (Math.random() - 0.5) * intensidadeTremor);
+            }
+
+                        // CAMADA 1: Background parallax
+                                    // === NOVA CAMADA: NUVENS (Parallax lento) ===
+            if (imgCloud.complete) {
+                const hNuvem = 280;
+                const lNuvem = hNuvem * (imgCloud.naturalWidth / imgCloud.naturalHeight);
+
+                let offset = (scrollX * 0.2) % lNuvem;   // velocidade um pouco mais lenta
+                if (offset < 0) offset += lNuvem;
+
+                ctx.save();
+                ctx.globalAlpha = 0.25;
+
+                // Desenha 4 cópias para garantir loop sem quebra
+                ctx.drawImage(imgCloud, -offset - lNuvem * 3, 1, lNuvem, hNuvem);
+                ctx.drawImage(imgCloud, -offset - lNuvem * 2, 1, lNuvem, hNuvem);
+                ctx.drawImage(imgCloud, -offset - lNuvem, 1, lNuvem, hNuvem);
+                ctx.drawImage(imgCloud, -offset, 1, lNuvem, hNuvem);
+                ctx.drawImage(imgCloud, -offset + lNuvem, 1, lNuvem, hNuvem);
+                ctx.drawImage(imgCloud, -offset + lNuvem * 2, 1, lNuvem, hNuvem);
+
+                ctx.restore();
+            }
+
+                        // CAMADA 1: Background Parallax
+            if (imgCidadeDistante.complete) {
+                const hC = 460;
+                const lC = hC * (imgCidadeDistante.naturalWidth / imgCidadeDistante.naturalHeight);
+                let descC = (scrollX * 0.3) % lC;
+                ctx.drawImage(imgCidadeDistante, -descC, canvas.height - hC, lC, hC);
+                ctx.drawImage(imgCidadeDistante, -descC + lC, canvas.height - hC, lC, hC);
+            }
+                        // === CAMADA: ZEPPELINS E OBJETOS VOADORES ===
+            parallaxFlyingObjects.forEach(obj => {
+                if (!obj.imgs || obj.imgs.length === 0) return;
+
+                // Animação
+                obj.timer++;
+                if (obj.timer > 8) {  // velocidade da animação
+                    obj.frame = (obj.frame + 1) % obj.imgs.length;
+                    obj.timer = 0;
+                }
+
+                // Movimento
+                obj.x += obj.speed * obj.direction * 0.8;   // velocidade real do voo
+
+                const drawX = obj.x - (scrollX * obj.speed);
+
+                // Desenha o frame atual
+                if (obj.imgs[obj.frame] && obj.imgs[obj.frame].complete) {
+                    ctx.drawImage(obj.imgs[obj.frame], drawX, obj.y, obj.w, obj.h);
+                }
+
+                // Remove se saiu da tela (para não acumular)
+                if (drawX + obj.w < -200) {
+                    obj.x = 40000; // reposiciona bem longe para reutilizar
+                }
+            });
+
+            if (imgRochas.complete) {
+                const hR = canvas.height;
+                const lR = hR * (imgRochas.naturalWidth / imgRochas.naturalHeight);
+                let progresso = (scrollX * 0.5 + canvas.width * 0.7) % (canvas.width + lR);
+                ctx.drawImage(imgRochas, canvas.width - progresso, 0, lR, hR);
+            }
+
+
+    // CAMADA 2: Mundo (Mapa, Boss, Inimigos e Perigos)
+            ctx.save();
+            ctx.translate(-scrollX, 0);
+            // 1. Desenho do Mapa
+           mapa.forEach(p => {
+                // === DESENHO ESPECIAL - CUBO DE ATIVAÇÃO ===
+                if (p.objeto && typeof p.objeto.desenhar === "function") {
+                    p.objeto.atualizar();
+                    p.objeto.desenhar();
+                    return; // ← importante: pula todo o desenho normal
+                }
+                            // === DEBUG HITBOXES (pressione H para ligar/desligar) ===
+               if (debugHitboxes) {
+                   ctx.strokeStyle = "lime";
+                   ctx.lineWidth = 2;
+                   ctx.strokeRect(cat.worldX - 28, cat.y - 5, 56, 70); // hitbox gato
+
+                   mapa.forEach(p => {
+                       if (p.objeto && p.objeto.estado) {
+                           ctx.strokeStyle = p.objeto.estado === "normal" ? "red" : "yellow";
+                           ctx.strokeRect(p.x + 6, p.y + p.h - 22, p.w - 12, 22);
+                       }
+                   });
+               }
+
+                // Desenho normal dos outros blocos
+                let img = p.sprite || (p.setor === 2 ? imgPlataformaS2 : imgPlataformaS1);
+                if (img && img.complete && img.naturalWidth !== 0) {
+                    if (p.tipo === "chao" || p.tipo === "plataforma" || p.tipo === "dano") {
+                        const lS = p.h * (img.naturalWidth / img.naturalHeight);
+                        for (let xP = 0; xP < p.w; xP += lS) {
+                            ctx.drawImage(img, p.x + xP, p.y, Math.min(lS, p.w - xP), p.h);
+                        }
+                    } else {
+                        ctx.drawImage(img, p.x, p.y, p.w, p.h);
+                    }
+                }
+
+                // Jaula
+                if (jaulaAtual && jaulaAtual.complete) {
+                    ctx.drawImage(jaulaAtual, 28215, 425 - 120, 175, 150);
+                }
+            });
+
+            // 2. Desenhar Inimigos Comuns (NftWite e Minibears de patrulha)
+            inimigosComuns.forEach(inimigo => {
+                inimigo.desenhar();
+            });
+
+            // 3. DESENHAR BOSS DA ARENA (MINIBEAR GLOBAL COM RASTROS)
+            if (cenaArenaOcorreu && (!miniBear.morto || miniBear.timerMorte > 0)) {
+
+                // --- PARTE NOVA: DESENHO DOS RASTROS (FANTASMAS) ---
+                if (miniBear.emDash && miniBear.timerMorte === 0) {
+                    miniBear.rastros.forEach((r, i) => {
+                        let imgR = imgsMiniBear[r.frame];
+                        // PROTEÇÃO ANTI-TELA AZUL: Só desenha se a imagem estiver carregada
+                        if (imgR && imgR.complete && imgR.naturalWidth !== 0) {
+                            ctx.save();
+                            // Opacidade diminui conforme o rastro fica mais antigo
+                            ctx.globalAlpha = (1 - i / miniBear.rastros.length) * 0.4;
+                            // Efeito visual de rastro (opcional: brilho ou cor sólida)
+                            ctx.filter = "brightness(1.5) sepia(1) hue-rotate(-50deg) saturate(5)";
+                            ctx.translate(r.x, r.y);
+
+                            if (r.dir === -1) {
+                                ctx.scale(-1, 1);
+                                ctx.drawImage(imgR, -miniBear.w, 0, miniBear.w, miniBear.h);
+                            } else {
+                                ctx.drawImage(imgR, 0, 0, miniBear.w, miniBear.h);
+                            }
+                            ctx.restore();
+                        }
+                    });
+                }
+
+                // --- DESENHO DO CORPO PRINCIPAL DO BOSS ---
+                let imgB = imgsMiniBear[miniBear.frame];
+                if (imgB && imgB.complete && imgB.naturalWidth !== 0) {
+                    ctx.save();
+                    if (miniBear.timerMorte > 0 || miniBear.cooldownDano > 0) {
+                        ctx.filter = "brightness(5)"; // Efeito de flash ao tomar dano
+                    }
+                    ctx.translate(miniBear.x, miniBear.y);
+                    if (miniBear.direcao === -1) {
+                        ctx.scale(-1, 1);
+                        ctx.drawImage(imgB, -miniBear.w, 0, miniBear.w, miniBear.h);
+                    } else {
+                        ctx.drawImage(imgB, 0, 0, miniBear.w, miniBear.h);
+                    }
+                    ctx.restore();
+                }
+            }
+
+            // 3. DESENHAR ASTES ELÉTRICAS (ENTIDADES DE PERIGO)
+            entidadesPerigo.forEach(ent => {
+                let arrayUso = (ent.tipo === "eletricoDireito") ? imgsAsteDireita :
+                    (ent.tipo === "eletricoEsquerdo") ? imgsAsteEsquerda : imgsAste;
+                let img = arrayUso[ent.frame];
+
+                // Proteção para as astes não ficarem invisíveis
+                if (img && img.complete && img.naturalWidth !== 0) {
+                    ctx.drawImage(img, ent.x, ent.y, ent.w * 1.5, ent.h * 1.5);
+                } else {
+                    // Se a imagem falhar, desenha um brilho ciano para sinalizar perigo
+                    ctx.fillStyle = "rgba(0, 255, 255, 0.3)";
+                    ctx.fillRect(ent.x, ent.y, ent.w, ent.h);
+                }
+            });
+
+            ctx.restore();
+
+            // --- DESENHAR MINIBEAR E SEUS RASTROS ---
+            if (cenaArenaOcorreu && (!miniBear.morto || miniBear.timerMorte > 0)) {
+
+                // 1. Rastros (Fantasmas Vermelhos) - Eles param de aparecer se estiver morrendo
+                if (miniBear.timerMorte === 0) {
+                    miniBear.rastros.forEach((r, i) => {
+                        let imgR = imgsMiniBear[r.frame];
+                        if (imgR && imgR.complete) {
+                            ctx.save();
+                            ctx.globalAlpha = (1 - i / miniBear.rastros.length) * 0.5;
+                            ctx.filter = "brightness(0.5) sepia(1) hue-rotate(-50deg) saturate(10) brightness(1.2)";
+                            ctx.globalCompositeOperation = "screen";
+                            ctx.translate(r.x, r.y);
+                            if (r.dir === -1) {
+                                ctx.scale(-1, 1);
+                                ctx.drawImage(imgR, -miniBear.w, 0, miniBear.w, miniBear.h);
+                            } else {
+                                ctx.drawImage(imgR, 0, 0, miniBear.w, miniBear.h);
+                            }
+                            ctx.restore();
+                        }
+                    });
+                }
+
+                // 2. BOSS PRINCIPAL (COM EFEITOS DE HIT E MORTE)
+                let imgB = imgsMiniBear[miniBear.frame];
+                if (imgB && imgB.complete) {
+                    ctx.save();
+
+                    // Lógica de Filtros e Transparência
+                    if (miniBear.timerMorte > 0) {
+                        // EFEITO DE MORTE: Pisca branco frenético
+                        if (Math.floor(miniBear.timerMorte / 4) % 2 === 0) {
+                            ctx.filter = "brightness(10) saturate(0)"; // Branco sólido
+                        } else {
+                            ctx.globalAlpha = 0.2; // Quase some
+                        }
+                    }
+                    else if (miniBear.cooldownDano > 0) {
+                        // EFEITO DE DANO: Flash e Pisca lento
+                        if (miniBear.cooldownDano > 30) {
+                            ctx.filter = "brightness(5)"; // Flash de impacto
+                        } else if (Math.floor(miniBear.cooldownDano / 8) % 2 === 0) {
+                            ctx.globalAlpha = 0.1; // Pisca
+                        }
+                    }
+
+                    ctx.translate(miniBear.x, miniBear.y);
+
+                    // Espelhamento e Desenho final
+                    if (miniBear.direcao === -1) {
+                        ctx.scale(-1, 1);
+                        ctx.drawImage(imgB, -miniBear.w, 0, miniBear.w, miniBear.h);
+                    } else {
+                        ctx.drawImage(imgB, 0, 0, miniBear.w, miniBear.h);
+                    }
+
+                    ctx.restore();
+                }
+            }
+
+            // Entidades Elétricas
+            entidadesPerigo.forEach(ent => {
+                let arrayUso = (ent.tipo === "eletricoDireito") ? imgsAsteDireita : (ent.tipo === "eletricoEsquerdo") ? imgsAsteEsquerda : imgsAste;
+                let img = arrayUso[ent.frame];
+                if (img && img.complete) ctx.drawImage(img, ent.x, ent.y, ent.w * 1.5, ent.h * 1.5);
+            });
+
+            ctx.restore(); // Fecha o translate(-scrollX) do mundo
+
+                        // === RASTRO DO BOOST (suave + efeito retrátil reforçado) ===
+            if (cat.rastros.length > 0 && !emCutscene) {
+                ctx.save();
+                ctx.globalCompositeOperation = "screen";
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = "#00ddff";
+
+                cat.rastros.forEach((r, i) => {
+                    const progress = i / (cat.rastros.length - 1 || 1);
+                    let alpha = Math.pow(1 - progress, 1.8) * 0.85;
+
+                    if (r.retract) alpha *= (1 - r.retract * 0.85); // some mais rápido
+
+                    const delayX = cat.direcao * (i * 6); // delay menor
+
+                    desenharcat(
+                        r.x - delayX,
+                        r.y,
+                        r.frame,
+                        r.dir,
+                        r.estado,
+                        r.vY,
+                        alpha
+                    );
+                });
+
+                ctx.restore();
+            }
+
+            if ((Date.now() < tempoDano + duracaoInvulnerabilidade) ? Math.floor(Date.now() / 100) % 2 === 0 : true) {
+                desenharcat(cat.currentX, cat.y, cat.frameAtual, cat.direcao, cat.estado, cat.velY, 1);
+            }
+                        // === BEAR PARADO NO MUNDO (durante cutscene) ===
+            if (cutsceneInicialAtiva && imgBearMoto2.complete) {
+                ctx.save();
+                ctx.translate(-scrollX, 0);
+                ctx.drawImage(imgBearMoto2, bearMotoWorldX, bearMotoWorldY, 160, 140);
+                ctx.restore();
+            }
+
+            // === POPUP BRANCO (UI fixa) ===
+                        // === POPUP + SPRITES DA CUTSCENE ===
+            if (cutsceneInicialAtiva) {
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+                if (cutsceneInicialStep < 5) {   // popup só enquanto não saiu o bear
+                    ctx.fillStyle = `rgba(255, 255, 255, ${popupAlpha * 0.95})`;
+                    ctx.fillRect(280, 160, 720, 360);
+                    ctx.strokeStyle = "#00ffff";
+                    ctx.lineWidth = 8;
+                    ctx.strokeRect(280, 160, 720, 360);
+
+                    // Sprites dentro do popup
+                    if (cutsceneInicialStep === 1) {
+                        let spkFrame = (Date.now() % 400 < 200) ? imgSpk1 : imgSpk2;
+                        if (spkFrame.complete) ctx.drawImage(spkFrame, 380, 230, 200, 200);
+                    }
+                    else if (cutsceneInicialStep === 2) {
+                        if (imgBearPose2.complete) ctx.drawImage(imgBearPose2, 380, 230, 200, 200);
+                    }
+                    else if (cutsceneInicialStep === 3) {
+                        if (imgInternPose.complete) ctx.drawImage(imgInternPose, 380, 230, 200, 200);
+                    }
+
+                    // Texto
+                    ctx.fillStyle = "#000000";
+                    ctx.font = "bold 32px monospace";
+                    ctx.textAlign = "left";
+                    ctx.fillText(textoAtual, 600, 350);
+                }
+
+                ctx.restore();
+            }
+
+            // === BEARMOTO2 ANDANDO NO MUNDO ===
+            if (cutsceneInicialAtiva && cutsceneInicialStep === 5 && imgBearMoto2.complete) {
+                ctx.save();
+                ctx.translate(-scrollX, 0);
+                ctx.drawImage(imgBearMoto2, bearMotoWorldX, bearMotoWorldY, 120, 140);
+                ctx.restore();
+            }
+
+            // CAMADA 4: Interface e Debug
+            desenharHUD();
+            if (ferramentaEdicaoAtiva) {
+             //   desenharEditorCoords();//  <--- ADICIONE AS BARRAS AQUI para esmagar as coordenadas do mouse
+                ctx.fillStyle = "yellow";
+                ctx.font = "bold 14px monospace";
+                ctx.fillText(`PINCEL [1-5]: ${catalogoEdicao[pincelAtual].nome.toUpperCase()}`, 30, 200);
+            }
+            if (exibindoMenuTeleporte) desenharMenuDebug();
+            if (godMode) {
+                ctx.fillStyle = "cyan";
+                ctx.font = "bold 16px monospace";
+                ctx.fillText("GOD MODE: ACTIVE", 30, 100);
+            }
+
+            ctx.restore(); // Fecha o save inicial (Tremor)
+
+                        // --- CAMADA FINAL: FADES E VÍDEO ---
+
+            // 1. Desenha a Imagem Preta (preto.png) - se estiver ativo
+            if (fadePretoAlpha > 0 && imgPreta.complete) {
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.globalAlpha = fadePretoAlpha;
+                ctx.drawImage(imgPreta, 0, 0, canvas.width, canvas.height);
+                ctx.restore();
+            }
+
+            // 2. DESENHA O VÍDEO FINAL (principal)
+            if (videoFinalAtivo && videoFinal) {
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);   // Isola completamente do resto
+                ctx.drawImage(videoFinal, 0, 0, canvas.width, canvas.height);
+                ctx.restore();
+            }
+            // 3. Fallback: imagem estática com fade (caso o vídeo não rode)
+            else if (finalFadeAlpha > 0 && imgFinalCreditos.complete) {
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.globalAlpha = finalFadeAlpha;
+                ctx.drawImage(imgFinalCreditos, 0, 0, canvas.width, canvas.height);
+                ctx.restore();
+            }
+
+            ctx.restore(); // Fecha o save inicial do tremor
+        }
+
+
+        function desenharcat(x, y, frame, dir, estado, velY, alfa) {
+            let img = imgcatStand;
+            if (estado === "pulando") img = (velY < 0) ? imgJump1 : imgJump2;
+            else if (estado === "correndo") img = imgsRun[frame];
+            if (img && img.complete) {
+                let lV = cat.altura * (img.naturalWidth / img.naturalHeight);
+                ctx.save(); ctx.globalAlpha = alfa; ctx.translate(x, y);
+                if (dir === -1) ctx.scale(-1, 1);
+                ctx.drawImage(img, -lV / 2, 0, lV, cat.altura);
+                ctx.restore();
+            }
+        }
+
+        function desenharHUD() {
+            ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+            if (imgLifeTxt.complete) ctx.drawImage(imgLifeTxt, 30, 25, 80, 30);
+            if (imgHeart.complete) for (let i = 0; i < 6; i++) { ctx.globalAlpha = (i < vida) ? 1.0 : 0.2; ctx.drawImage(imgHeart, 30 + (i * 45), 60, 40, 40); }
+           // ctx.fillStyle = "rgba(0, 0, 0, 0.5)"; ctx.fillRect(30, 110, 180, 30);
+            //ctx.fillStyle = "#00ff00"; ctx.font = "bold 18px monospace"; // ctx.fillText(`POS X: ${Math.floor(cat.worldX)}px`, 40, 132);
+            ctx.restore();
+        }
+
+        function desenharEditorCoords() {
+            ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+            //ctx.fillStyle = "rgba(0,0,0,0.7)"; ctx.fillRect(10, 150, 220, 35);
+            //ctx.fillStyle = "yellow"; ctx.font = "bold 16px monospace"; // ctx.fillText(`MOUSE X:${mouseWorldX} Y:${mouseWorldY}`, 20, 173);
+            const cursorX = mouseWorldX - scrollX;
+            ctx.strokeStyle = "yellow"; ctx.beginPath(); ctx.moveTo(cursorX - 15, mouseWorldY); ctx.lineTo(cursorX + 15, mouseWorldY); ctx.moveTo(cursorX, mouseWorldY - 15); ctx.lineTo(cursorX, mouseWorldY + 15); ctx.stroke();
+            ctx.restore();
+        }
+
+        // --- FUNÇÃO DO MENU ATUALIZADA ---
+        function desenharMenuDebug() {
+            ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+            const menuW = 500;
+            const menuH = 300;
+            const x = canvas.width / 2 - menuW / 2;
+            const y = canvas.height / 2 - menuH / 2;
+
+            // Fundo e Borda
+            ctx.fillStyle = "rgba(0, 0, 0, 0.95)";
+            ctx.fillRect(x, y, menuW, menuH);
+            ctx.strokeStyle = "#00ff00";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, menuW, menuH);
+
+            // Cabeçalho
+            ctx.fillStyle = "white";
+            ctx.font = "bold 20px monospace";
+            ctx.textAlign = "center";
+            ctx.fillText(`LEVEL ${menuDebug.faseSelecionada} (A/D PARA MUDAR)`, x + menuW / 2, y + 35);
+            ctx.strokeStyle = "#444";
+            ctx.beginPath(); ctx.moveTo(x + 20, y + 55); ctx.lineTo(x + menuW - 20, y + 55); ctx.stroke();
+
+            // Área de Itens (com Clip para rolagem)
+            const areaX = x + 20;
+            const areaY = y + 70;
+            const areaW = menuW - 40;
+            const areaH = 210;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(areaX, areaY, areaW, areaH);
+            ctx.clip();
+
+            const setores = menuDebug.pontos[menuDebug.faseSelecionada];
+            setores.forEach((s, i) => {
+                const itemY = areaY + (i * alturaItem) - scrollMenu;
+
+                // Destaque de Seleção (W/S)
+                if (i === indiceSelecaoMenu) {
+                    ctx.fillStyle = "rgba(0, 255, 0, 0.2)";
+                    ctx.fillRect(areaX, itemY, areaW, alturaItem);
+                    ctx.strokeStyle = "#00ff00";
+                    ctx.strokeRect(areaX, itemY, areaW, alturaItem);
+                }
+
+                ctx.fillStyle = (i === indiceSelecaoMenu) ? "#00ff00" : "white";
+                ctx.font = "16px monospace";
+                ctx.textAlign = "left";
+                ctx.fillText(`> ${s.nome}`, areaX + 15, itemY + 25);
+            });
+            ctx.restore();
+
+            // Barra de rolagem minimalista
+            if (setores.length * alturaItem > areaH) {
+                const scrollH = (areaH / (setores.length * alturaItem)) * areaH;
+                const scrollY = areaY + (scrollMenu / (setores.length * alturaItem)) * areaH;
+                ctx.fillStyle = "#555";
+                ctx.fillRect(x + menuW - 10, areaY, 4, areaH);
+                ctx.fillStyle = "#00ff00";
+                ctx.fillRect(x + menuW - 10, scrollY, 4, scrollH);
+            }
+            
+        
+
+            ctx.restore();
+            
+        }
+
+        function exibirGameOver() {
+                // Para todas as músicas ao morrer
+                bgmLevel1.pause();
+                bgmLevel1.currentTime = 0;
+                bgmArena.pause();
+                bgmArena.currentTime = 0;
+
+                ctx.fillStyle = "rgba(0,0,0,0.85)";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.fillStyle = "#ff3366";
+                ctx.font = "bold 60px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText("MISSION FAILED", canvas.width / 2, canvas.height / 2 - 30);
+
+                // Nova linha abaixo
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 24px monospace";
+                ctx.fillText("PRESS F5 TO RESTART", canvas.width / 2, canvas.height / 2 + 40);
+            }
+
+        loop();
+    </script>
+</body>
+
+</html>
